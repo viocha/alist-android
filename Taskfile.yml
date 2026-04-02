@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  FLUTTER: flutter
+  ADB: adb
+  BUILD_TARGET_PLATFORM: android-arm64
+  DEBUG_APK: build/app/outputs/flutter-apk/app-debug.apk
+  ANDROID_PACKAGE: com.viocha.alist_android
+  ANDROID_ACTIVITY: .MainActivity
+  ICON_SCRIPT: scripts/generate_app_icon.mjs
+  ICON_SOURCE_SVG: assets/app_icon/icon.svg
+  ICON_OUTPUT_PNG: build/app_icon/icon.png
+  ANDROID_RES_DIR: android/app/src/main/res
+
+tasks:
+  prepare:android:icon:
+    desc: Generate launcher icon assets from the source SVG
+    cmds:
+      - 'node "{{.ICON_SCRIPT}}" --source "{{.ICON_SOURCE_SVG}}" --output "{{.ICON_OUTPUT_PNG}}" --android-res "{{.ANDROID_RES_DIR}}"'
+
+  build:android:
+    desc: Build the arm64 Android debug APK
+    cmds:
+      - task: prepare:android:icon
+      - '{{.FLUTTER}} build apk --debug --target-platform {{.BUILD_TARGET_PLATFORM}}'
+
+  install:android:only:
+    desc: Install the existing arm64 Android debug APK on the connected device
+    cmds:
+      - 'powershell -NoProfile -Command "if (-not (Test-Path ''{{.DEBUG_APK}}'')) { throw ''APK 不存在，请先执行 task build:android'' }; & {{.ADB}} install -r ''{{.DEBUG_APK}}''"'
+
+  install:android:
+    desc: Build and install the arm64 Android debug APK on the connected device
+    deps:
+      - build:android
+    cmds:
+      - task: install:android:only
+
+  launch:android:
+    desc: Launch the app on the connected Android device
+    cmds:
+      - '{{.ADB}} shell am start -n {{.ANDROID_PACKAGE}}/{{.ANDROID_ACTIVITY}}'
+
+  debug:android:
+    desc: Run the app on the first connected Android device with Flutter debug and hot reload
+    cmds:
+      - 'powershell -NoProfile -Command "$serial = (& {{.ADB}} devices | Select-String ''`tdevice$'' | Select-Object -First 1 | ForEach-Object { $_.ToString().Split(''`t'')[0] }); if (-not $serial) { throw ''没有检测到已连接的 Android 设备'' }; & {{.FLUTTER}} run -d $serial --target-platform {{.BUILD_TARGET_PLATFORM}}"'
+
+  run:android:
+    desc: Build, install, and launch the arm64 Android app on the connected device
+    deps:
+      - install:android
+    cmds:
+      - task: launch:android

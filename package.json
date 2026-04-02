@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "generate:app-icon": "node scripts/generate_app_icon.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.59.1",
+    "sharp": "^0.34.5"
+  }
+}
