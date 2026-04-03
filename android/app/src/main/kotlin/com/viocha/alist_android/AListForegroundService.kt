@@ -5,17 +5,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import android.net.wifi.WifiManager
 import androidx.core.app.NotificationCompat
 
 class AListForegroundService : Service() {
     private var cpuWakeLock: PowerManager.WakeLock? = null
-    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -176,27 +173,9 @@ class AListForegroundService : Service() {
                     acquire()
                 }
         }
-
-        if (wifiLock?.isHeld != true) {
-            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            @Suppress("DEPRECATION")
-            wifiLock = wifiManager
-                ?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "$packageName:AListWifi")
-                ?.apply {
-                    setReferenceCounted(false)
-                    acquire()
-                }
-        }
     }
 
     private fun releaseRuntimeLocks() {
-        wifiLock?.run {
-            if (isHeld) {
-                release()
-            }
-        }
-        wifiLock = null
-
         cpuWakeLock?.run {
             if (isHeld) {
                 release()
