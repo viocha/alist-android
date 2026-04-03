@@ -267,6 +267,7 @@ class MainActivity : FlutterActivity() {
         val browserIntent = Intent(Intent.ACTION_VIEW).apply {
             data = Uri.parse(url)
             addCategory(Intent.CATEGORY_BROWSABLE)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         val resolvedActivity = browserIntent.resolveActivity(packageManager)
         if (resolvedActivity == null) {
@@ -280,12 +281,8 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        val chooserIntent = Intent.createChooser(browserIntent, "打开 AList").apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-
         try {
-            applicationContext.startActivity(chooserIntent)
+            applicationContext.startActivity(browserIntent)
             result.success(
                 mapOf(
                     "success" to true,
