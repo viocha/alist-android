@@ -22,6 +22,7 @@ class AListController extends ChangeNotifier {
 
   static const String _prefsPortKey = 'preferred_port';
   static const String _prefsPasswordKey = 'preferred_admin_password';
+  static const int _tokenExpiresInHours = 876000;
   static const int maxVisibleLogLines = 300;
   static final RegExp _ansiEscapePattern =
       RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]');
@@ -489,6 +490,7 @@ class AListController extends ChangeNotifier {
 
     final updated = <String, Object?>{
       ...configMap,
+      'token_expires_in': _tokenExpiresInHours,
       'scheme': scheme,
     };
 
@@ -505,7 +507,7 @@ class AListController extends ChangeNotifier {
       'site_url': '',
       'cdn': '',
       'jwt_secret': jwtSecret,
-      'token_expires_in': 48,
+      'token_expires_in': _tokenExpiresInHours,
       'database': <String, Object?>{
         'type': 'sqlite3',
         'host': '',
