@@ -63,6 +63,7 @@ class AListController extends ChangeNotifier {
   int _autoSaveCompletedRevision = 0;
   Completer<void>? _serviceTransitionCompleter;
   bool? _pendingRunningState;
+  String? _lastSyncedNotificationMessage;
 
   bool initialized = false;
   bool busy = false;
@@ -426,6 +427,7 @@ class AListController extends ChangeNotifier {
 
     if (event.status != null) {
       status = event.status!;
+      _syncRunningNotificationIfNeeded();
       _resolveServiceTransitionIfNeeded();
       shouldNotify = true;
     }
@@ -465,9 +467,33 @@ class AListController extends ChangeNotifier {
 
     _pendingRunningState = null;
     _serviceTransitionCompleter = null;
+    busy = false;
+    busyMessage = '';
+    busyProgress = null;
     if (!completer.isCompleted) {
       completer.complete();
     }
+  }
+
+  void _syncRunningNotificationIfNeeded() {
+    if (!status.running) {
+      _lastSyncedNotificationMessage = null;
+      return;
+    }
+
+    final port = status.port ?? _parsePort() ?? 5244;
+    final message = '服务运行中，端口 $port';
+    if (_lastSyncedNotificationMessage == message) {
+      return;
+    }
+
+    _lastSyncedNotificationMessage = message;
+    unawaited(
+      _nativeApi.updateServiceNotification(
+        port: port,
+        message: message,
+      ),
+    );
   }
 
   String _appendLogs(String current, String incoming) {

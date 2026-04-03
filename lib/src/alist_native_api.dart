@@ -72,6 +72,20 @@ class AListNativeApi {
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
+  Future<OperationResult> updateServiceNotification({
+    required int port,
+    required String message,
+  }) async {
+    final map = await _channel.invokeMapMethod<Object?, Object?>(
+      'updateServiceNotification',
+      <String, Object?>{
+        'port': port,
+        'message': message,
+      },
+    );
+    return OperationResult.fromMap(map ?? const <Object?, Object?>{});
+  }
+
   Future<OperationResult> requestNotificationPermission() async {
     final map = await _channel.invokeMapMethod<Object?, Object?>(
       'requestNotificationPermission',

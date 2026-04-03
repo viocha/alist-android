@@ -99,11 +99,28 @@ class MainActivity : FlutterActivity() {
                     putExtra(AListForegroundService.EXTRA_PORT, port)
                     putExtra(AListForegroundService.EXTRA_PASSWORD, password)
                 }
-                ContextCompat.startForegroundService(applicationContext, intent)
+                applicationContext.startService(intent)
                 result.success(
                     mapOf(
                         "success" to true,
                         "message" to "Foreground service start requested.",
+                    ),
+                )
+            }
+            "updateServiceNotification" -> {
+                val port = call.argument<Int>("port") ?: 5244
+                val message = call.argument<String>("message") ?: "服务运行中，端口 $port"
+                val intent = Intent(applicationContext, AListForegroundService::class.java).apply {
+                    action = AListForegroundService.ACTION_UPDATE_NOTIFICATION
+                    putExtra(AListForegroundService.EXTRA_PORT, port)
+                    putExtra(AListForegroundService.EXTRA_MESSAGE, message)
+                }
+                applicationContext.startService(intent)
+                result.success(
+                    mapOf(
+                        "success" to true,
+                        "message" to "Foreground notification update requested.",
+                        "shouldNotify" to false,
                     ),
                 )
             }

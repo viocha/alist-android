@@ -42,31 +42,31 @@ class AListForegroundService : Service() {
                 return START_NOT_STICKY
             }
 
+            ACTION_UPDATE_NOTIFICATION -> {
+                val port = intent.getIntExtra(EXTRA_PORT, 5244)
+                val message =
+                    intent.getStringExtra(EXTRA_MESSAGE) ?: "服务运行中，端口 $port"
+                notificationManager().notify(
+                    NOTIFICATION_ID,
+                    buildNotification(message, port),
+                )
+                return START_STICKY
+            }
+
             ACTION_START -> {
                 val port = intent.getIntExtra(EXTRA_PORT, 5244)
                 val password = intent.getStringExtra(EXTRA_PASSWORD) ?: ""
 
                 acquireRuntimeLocks()
-                startForeground(NOTIFICATION_ID, buildNotification("正在启动服务", port))
 
                 val startResult = AListRuntime.start(applicationContext, port, password) {
                     stopServiceNotification()
                 }
 
                 if (!startResult.success) {
-                    notificationManager().notify(
-                        NOTIFICATION_ID,
-                        buildNotification(startResult.message, port),
-                    )
-                stopForegroundCompat()
-                stopSelf()
-                return START_NOT_STICKY
-            }
-
-                notificationManager().notify(
-                    NOTIFICATION_ID,
-                    buildNotification("服务运行中，端口 $port", port),
-                )
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 return START_STICKY
             }
 
@@ -188,8 +188,10 @@ class AListForegroundService : Service() {
         const val ACTION_START = "com.viocha.alist_android.action.START"
         const val ACTION_STOP = "com.viocha.alist_android.action.STOP"
         const val ACTION_RESTORE_NOTIFICATION = "com.viocha.alist_android.action.RESTORE_NOTIFICATION"
+        const val ACTION_UPDATE_NOTIFICATION = "com.viocha.alist_android.action.UPDATE_NOTIFICATION"
         const val EXTRA_PORT = "extra_port"
         const val EXTRA_PASSWORD = "extra_password"
+        const val EXTRA_MESSAGE = "extra_message"
 
         private const val CHANNEL_ID = "alist_service_channel"
         private const val NOTIFICATION_ID = 4041
