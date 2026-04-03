@@ -202,7 +202,6 @@ object AListRuntime {
                 binaryFile.absolutePath,
                 "--data",
                 runtimePaths.dataDir,
-                "--log-std",
                 "server",
             )
 
