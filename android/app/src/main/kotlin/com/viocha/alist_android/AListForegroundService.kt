@@ -120,10 +120,6 @@ class AListForegroundService : Service() {
             .setContentIntent(openAppPendingIntent)
             .setDeleteIntent(restorePendingIntent)
             .addAction(android.R.drawable.ic_media_pause, "停止", stopPendingIntent)
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("AList 服务状态：$content\n访问端口：$port"),
-            )
             .build()
     }
 

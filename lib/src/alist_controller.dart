@@ -56,8 +56,10 @@ class AListController extends ChangeNotifier {
 
   SharedPreferences? _preferences;
   StreamSubscription<AListRuntimeEvent>? _runtimeEventsSubscription;
-  Timer? _autoSaveTimer;
   bool _refreshing = false;
+  bool _autoSaveInProgress = false;
+  int _autoSaveRequestedRevision = 0;
+  int _autoSaveCompletedRevision = 0;
 
   bool initialized = false;
   bool busy = false;
@@ -95,7 +97,6 @@ class AListController extends ChangeNotifier {
   @override
   void dispose() {
     _runtimeEventsSubscription?.cancel();
-    _autoSaveTimer?.cancel();
     super.dispose();
   }
 
@@ -370,19 +371,35 @@ class AListController extends ChangeNotifier {
   }
 
   void _scheduleAutoSave() {
-    _autoSaveTimer?.cancel();
+    _autoSaveRequestedRevision += 1;
     autoSavePending = true;
-    _autoSaveTimer = Timer(const Duration(milliseconds: 450), () async {
-      final port = _parsePort();
-      if (port != null) {
-        await _persistPreferences();
-        await _saveSettingsSilently(port: port);
-      } else {
-        await _persistPreferences();
-      }
-      autoSavePending = false;
+    unawaited(_flushAutoSave());
+  }
+
+  Future<void> _flushAutoSave() async {
+    if (_autoSaveInProgress) {
       notifyListeners();
-    });
+      return;
+    }
+
+    _autoSaveInProgress = true;
+    notifyListeners();
+
+    try {
+      while (_autoSaveCompletedRevision != _autoSaveRequestedRevision) {
+        final targetRevision = _autoSaveRequestedRevision;
+        final port = _parsePort();
+        await _persistPreferences();
+        if (port != null) {
+          await _saveSettingsSilently(port: port);
+        }
+        _autoSaveCompletedRevision = targetRevision;
+      }
+    } finally {
+      _autoSaveInProgress = false;
+      autoSavePending = _autoSaveCompletedRevision != _autoSaveRequestedRevision;
+      notifyListeners();
+    }
   }
 
   Future<void> _saveSettingsSilently({required int port}) async {

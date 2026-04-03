@@ -289,16 +289,6 @@ class _AListHomePage extends StatelessWidget {
                               onChanged: controller.setAdminPassword,
                             ),
                             const SizedBox(height: 18),
-                            if (controller.autoSavePending)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Text(
-                                  '正在自动保存设置…',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: const Color(0xFF667085),
-                                      ),
-                                ),
-                              ),
                             SizedBox(
                               width: double.infinity,
                               child: status.running
