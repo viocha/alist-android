@@ -296,33 +296,50 @@ class _AListHomePage extends StatelessWidget {
                               onChanged: controller.setAdminPassword,
                             ),
                             const SizedBox(height: 18),
-                            SizedBox(
-                              width: double.infinity,
-                              child: status.running
-                                  ? OutlinedButton.icon(
-                                      onPressed: busy
-                                          ? null
-                                          : () => onAction(controller.toggleService),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                      ),
-                                      icon: const Icon(Icons.stop_circle_outlined),
-                                      label: const Text('停止服务'),
-                                    )
-                                  : FilledButton.icon(
-                                      onPressed: busy
-                                          ? null
-                                          : () => onAction(controller.toggleService),
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                        ),
-                                      ),
-                                      icon: const Icon(Icons.play_arrow_rounded),
-                                      label: const Text('启动服务'),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                OutlinedButton(
+                                  onPressed: controller.canApplyAdminPassword
+                                      ? () => onAction(controller.applyAdminPassword)
+                                      : null,
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 12,
                                     ),
+                                  ),
+                                  child: const Text('修改密码'),
+                                ),
+                                const SizedBox(width: 12),
+                                status.running
+                                    ? OutlinedButton.icon(
+                                        onPressed: busy
+                                            ? null
+                                            : () => onAction(controller.toggleService),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 18,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.stop_circle_outlined),
+                                        label: const Text('停止服务'),
+                                      )
+                                    : FilledButton.icon(
+                                        onPressed: busy
+                                            ? null
+                                            : () => onAction(controller.toggleService),
+                                        style: FilledButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 18,
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.play_arrow_rounded),
+                                        label: const Text('启动服务'),
+                                      ),
+                              ],
                             ),
                           ],
                         ),

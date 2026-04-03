@@ -93,11 +93,9 @@ class MainActivity : FlutterActivity() {
             "openBatterySettings" -> openBatterySettings(result)
             "startService" -> {
                 val port = call.argument<Int>("port") ?: 5244
-                val password = call.argument<String>("password") ?: ""
                 val intent = Intent(applicationContext, AListForegroundService::class.java).apply {
                     action = AListForegroundService.ACTION_START
                     putExtra(AListForegroundService.EXTRA_PORT, port)
-                    putExtra(AListForegroundService.EXTRA_PASSWORD, password)
                 }
                 applicationContext.startService(intent)
                 result.success(

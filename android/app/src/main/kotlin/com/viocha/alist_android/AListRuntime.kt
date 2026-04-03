@@ -180,7 +180,7 @@ object AListRuntime {
         return runShortCommand(runtimePaths, command, "Admin password updated.")
     }
 
-    fun start(context: Context, port: Int, password: String, onExit: (Int) -> Unit): CommandResult {
+    fun start(context: Context, port: Int, onExit: (Int) -> Unit): CommandResult {
         synchronized(processLock) {
             if (isRunning()) {
                 emitStatus(context)
@@ -197,15 +197,6 @@ object AListRuntime {
             }
 
             ensureBinaryExecutable(binaryFile.absolutePath)
-
-            if (password.isNotBlank()) {
-                val passwordResult = applyAdminPassword(context, password)
-                if (!passwordResult.success) {
-                    lastMessage = passwordResult.message
-                    emitStatus(context)
-                    return passwordResult
-                }
-            }
 
             val startCommand = listOf(
                 binaryFile.absolutePath,

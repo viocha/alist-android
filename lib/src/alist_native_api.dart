@@ -54,13 +54,11 @@ class AListNativeApi {
 
   Future<OperationResult> startService({
     required int port,
-    required String password,
   }) async {
     final map = await _channel.invokeMapMethod<Object?, Object?>(
       'startService',
       <String, Object?>{
         'port': port,
-        'password': password,
       },
     );
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});

@@ -22,6 +22,8 @@ class AListController extends ChangeNotifier {
 
   static const String _prefsPortKey = 'preferred_port';
   static const String _prefsPasswordKey = 'preferred_admin_password';
+  static const String _prefsLastAppliedPasswordKey = 'last_applied_admin_password';
+  static const String _prefsPasswordInitializedKey = 'admin_password_initialized';
   static const int _tokenExpiresInHours = 876000;
   static const int maxVisibleLogLines = 300;
   static final RegExp _ansiEscapePattern =
@@ -72,6 +74,8 @@ class AListController extends ChangeNotifier {
   String logs = '';
   String portInput = '5244';
   String adminPassword = '';
+  String lastAppliedAdminPassword = '';
+  bool adminPasswordInitialized = false;
   bool passwordVisible = false;
   bool autoSavePending = false;
   RuntimeMetadata? installedRuntime;
@@ -82,8 +86,16 @@ class AListController extends ChangeNotifier {
     _preferences = await SharedPreferences.getInstance();
     final envPassword = await _readPasswordFromEnv();
     portInput = _preferences?.getString(_prefsPortKey) ?? '5244';
+    lastAppliedAdminPassword =
+        _preferences?.getString(_prefsLastAppliedPasswordKey) ?? '';
+    adminPasswordInitialized =
+        (_preferences?.getBool(_prefsPasswordInitializedKey) ?? false) ||
+        lastAppliedAdminPassword.trim().isNotEmpty;
     adminPassword =
-        _preferences?.getString(_prefsPasswordKey) ?? envPassword ?? '';
+        _preferences?.getString(_prefsPasswordKey) ??
+        (lastAppliedAdminPassword.isNotEmpty
+            ? lastAppliedAdminPassword
+            : envPassword ?? '');
 
     paths = await _nativeApi.getPaths();
     installedRuntime = await _readRuntimeMetadata();
@@ -153,10 +165,12 @@ class AListController extends ChangeNotifier {
         await _saveSettingsSilently(port: port);
         await _persistPreferences();
 
-        final result = await _nativeApi.startService(
-          port: port,
-          password: adminPassword.trim(),
-        );
+        final initialPasswordResult = await _applyInitialPasswordIfNeeded();
+        if (!initialPasswordResult.success) {
+          return initialPasswordResult;
+        }
+
+        final result = await _nativeApi.startService(port: port);
         if (result.success) {
           await _waitForServiceState(true);
         }
@@ -306,6 +320,42 @@ class AListController extends ChangeNotifier {
     return _nativeApi.openBatterySettings();
   }
 
+  Future<OperationResult> applyAdminPassword() async {
+    final password = adminPassword.trim();
+    if (password.isEmpty) {
+      return const OperationResult(
+        success: false,
+        message: '管理员密码不能为空。',
+        shouldNotify: false,
+      );
+    }
+    if (password == lastAppliedAdminPassword.trim()) {
+      return const OperationResult(
+        success: false,
+        message: '管理员密码未发生变化。',
+        shouldNotify: false,
+      );
+    }
+    if (status.running) {
+      return const OperationResult(
+        success: false,
+        message: '请先停止服务，再修改管理员密码。',
+      );
+    }
+
+    return _runBusy(
+      label: '正在修改管理员密码…',
+      action: () async {
+        final result = await _nativeApi.applyAdminPassword(password);
+        if (!result.success) {
+          return result;
+        }
+        await _markPasswordApplied(password);
+        return result;
+      },
+    );
+  }
+
   void setPortInput(String value) {
     portInput = value;
     _scheduleAutoSave();
@@ -321,6 +371,14 @@ class AListController extends ChangeNotifier {
   void togglePasswordVisibility() {
     passwordVisible = !passwordVisible;
     notifyListeners();
+  }
+
+  bool get canApplyAdminPassword {
+    final password = adminPassword.trim();
+    return !busy &&
+        !status.running &&
+        password.isNotEmpty &&
+        password != lastAppliedAdminPassword.trim();
   }
 
   Future<OperationResult> _runBusy({
@@ -382,6 +440,32 @@ class AListController extends ChangeNotifier {
   Future<void> _persistPreferences() async {
     await _preferences?.setString(_prefsPortKey, portInput.trim());
     await _preferences?.setString(_prefsPasswordKey, adminPassword);
+  }
+
+  Future<OperationResult> _applyInitialPasswordIfNeeded() async {
+    final password = adminPassword.trim();
+    if (adminPasswordInitialized || password.isEmpty) {
+      return const OperationResult(
+        success: true,
+        message: '',
+        shouldNotify: false,
+      );
+    }
+
+    final result = await _nativeApi.applyAdminPassword(password);
+    if (!result.success) {
+      return result;
+    }
+    await _markPasswordApplied(password);
+    return result;
+  }
+
+  Future<void> _markPasswordApplied(String password) async {
+    lastAppliedAdminPassword = password;
+    adminPasswordInitialized = true;
+    await _preferences?.setString(_prefsLastAppliedPasswordKey, password);
+    await _preferences?.setBool(_prefsPasswordInitializedKey, true);
+    notifyListeners();
   }
 
   void _scheduleAutoSave() {

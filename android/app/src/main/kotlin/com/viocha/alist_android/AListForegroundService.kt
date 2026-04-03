@@ -55,11 +55,10 @@ class AListForegroundService : Service() {
 
             ACTION_START -> {
                 val port = intent.getIntExtra(EXTRA_PORT, 5244)
-                val password = intent.getStringExtra(EXTRA_PASSWORD) ?: ""
 
                 acquireRuntimeLocks()
 
-                val startResult = AListRuntime.start(applicationContext, port, password) {
+                val startResult = AListRuntime.start(applicationContext, port) {
                     stopServiceNotification()
                 }
 
@@ -190,7 +189,6 @@ class AListForegroundService : Service() {
         const val ACTION_RESTORE_NOTIFICATION = "com.viocha.alist_android.action.RESTORE_NOTIFICATION"
         const val ACTION_UPDATE_NOTIFICATION = "com.viocha.alist_android.action.UPDATE_NOTIFICATION"
         const val EXTRA_PORT = "extra_port"
-        const val EXTRA_PASSWORD = "extra_password"
         const val EXTRA_MESSAGE = "extra_message"
 
         private const val CHANNEL_ID = "alist_service_channel"

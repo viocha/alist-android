@@ -46,7 +46,12 @@ tasks:
   debug:android:
     desc: Run the app on the first connected Android device with Flutter debug and hot reload
     cmds:
-      - 'powershell -NoProfile -Command "$serial = (& {{.ADB}} devices | Select-String ''`tdevice$'' | Select-Object -First 1 | ForEach-Object { $_.ToString().Split(''`t'')[0] }); if (-not $serial) { throw ''没有检测到已连接的 Android 设备'' }; & {{.FLUTTER}} run -d $serial --target-platform {{.BUILD_TARGET_PLATFORM}}"'
+      - >
+        powershell -NoProfile -Command '$deviceLine = (& {{.ADB}} devices) |
+        Where-Object { $_ -match "^[^\s]+\s+device$" } | Select-Object -First 1;
+        if (-not $deviceLine) { throw "没有检测到已连接的 Android 设备" };
+        $serial = ($deviceLine -split "\s+")[0];
+        & {{.FLUTTER}} run -d $serial'
 
   run:android:
     desc: Build, install, and launch the arm64 Android app on the connected device
