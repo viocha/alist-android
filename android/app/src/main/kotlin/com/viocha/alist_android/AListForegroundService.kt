@@ -5,12 +5,18 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.net.wifi.WifiManager
 import androidx.core.app.NotificationCompat
 
 class AListForegroundService : Service() {
+    private var cpuWakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -19,7 +25,7 @@ class AListForegroundService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 AListRuntime.stop(applicationContext)
-                dismissNotification()
+                stopServiceNotification()
                 return START_NOT_STICKY
             }
 
@@ -28,13 +34,14 @@ class AListForegroundService : Service() {
                 val running = status["running"] == true
                 val port = (status["port"] as? Number)?.toInt() ?: 5244
                 if (running) {
+                    acquireRuntimeLocks()
                     startForeground(
                         NOTIFICATION_ID,
                         buildNotification("服务运行中，端口 $port", port),
                     )
                     return START_STICKY
                 }
-                dismissNotification()
+                stopServiceNotification()
                 return START_NOT_STICKY
             }
 
@@ -42,10 +49,11 @@ class AListForegroundService : Service() {
                 val port = intent.getIntExtra(EXTRA_PORT, 5244)
                 val password = intent.getStringExtra(EXTRA_PASSWORD) ?: ""
 
+                acquireRuntimeLocks()
                 startForeground(NOTIFICATION_ID, buildNotification("正在启动服务", port))
 
                 val startResult = AListRuntime.start(applicationContext, port, password) {
-                    dismissNotification()
+                    stopServiceNotification()
                 }
 
                 if (!startResult.success) {
@@ -62,7 +70,7 @@ class AListForegroundService : Service() {
                     NOTIFICATION_ID,
                     buildNotification("服务运行中，端口 $port", port),
                 )
-                return START_NOT_STICKY
+                return START_STICKY
             }
 
             else -> {
@@ -72,10 +80,11 @@ class AListForegroundService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         if (AListRuntime.getStatus(applicationContext)["running"] == true) {
             AListRuntime.stop(applicationContext)
         }
+        releaseRuntimeLocks()
+        super.onDestroy()
     }
 
     private fun buildNotification(content: String, port: Int): Notification {
@@ -113,7 +122,7 @@ class AListForegroundService : Service() {
             .setSmallIcon(android.R.drawable.stat_sys_upload_done)
             .setContentTitle("AList")
             .setContentText(content)
-            .setOngoing(false)
+            .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
@@ -150,10 +159,50 @@ class AListForegroundService : Service() {
         }
     }
 
-    private fun dismissNotification() {
+    private fun stopServiceNotification() {
+        releaseRuntimeLocks()
         stopForegroundCompat()
         notificationManager().cancel(NOTIFICATION_ID)
         stopSelf()
+    }
+
+    private fun acquireRuntimeLocks() {
+        if (cpuWakeLock?.isHeld != true) {
+            val powerManager = getSystemService(PowerManager::class.java)
+            cpuWakeLock = powerManager
+                ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:AListCpu")
+                ?.apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+        }
+
+        if (wifiLock?.isHeld != true) {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            @Suppress("DEPRECATION")
+            wifiLock = wifiManager
+                ?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "$packageName:AListWifi")
+                ?.apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+        }
+    }
+
+    private fun releaseRuntimeLocks() {
+        wifiLock?.run {
+            if (isHeld) {
+                release()
+            }
+        }
+        wifiLock = null
+
+        cpuWakeLock?.run {
+            if (isHeld) {
+                release()
+            }
+        }
+        cpuWakeLock = null
     }
 
     companion object {
