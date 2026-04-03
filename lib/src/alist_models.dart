@@ -82,6 +82,34 @@ class AListStatus {
   final int? pid;
   final AListPaths? paths;
 
+  AListStatus copyWith({
+    bool? running,
+    int? port,
+    DateTime? startedAt,
+    Object? lastExitCode = _sentinel,
+    String? lastMessage,
+    bool? binaryReady,
+    bool? configExists,
+    bool? logExists,
+    Object? pid = _sentinel,
+    AListPaths? paths,
+  }) {
+    return AListStatus(
+      running: running ?? this.running,
+      port: port ?? this.port,
+      startedAt: startedAt ?? this.startedAt,
+      lastExitCode: identical(lastExitCode, _sentinel)
+          ? this.lastExitCode
+          : lastExitCode as int?,
+      lastMessage: lastMessage ?? this.lastMessage,
+      binaryReady: binaryReady ?? this.binaryReady,
+      configExists: configExists ?? this.configExists,
+      logExists: logExists ?? this.logExists,
+      pid: identical(pid, _sentinel) ? this.pid : pid as int?,
+      paths: paths ?? this.paths,
+    );
+  }
+
   factory AListStatus.initial() {
     return const AListStatus(
       running: false,
@@ -207,3 +235,5 @@ int? _asInt(Object? value) {
   }
   return null;
 }
+
+const Object _sentinel = Object();

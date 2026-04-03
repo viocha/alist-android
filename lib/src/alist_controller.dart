@@ -61,6 +61,8 @@ class AListController extends ChangeNotifier {
   bool _autoSaveInProgress = false;
   int _autoSaveRequestedRevision = 0;
   int _autoSaveCompletedRevision = 0;
+  Completer<void>? _serviceTransitionCompleter;
+  bool? _pendingRunningState;
 
   bool initialized = false;
   bool busy = false;
@@ -154,6 +156,9 @@ class AListController extends ChangeNotifier {
           port: port,
           password: adminPassword.trim(),
         );
+        if (result.success) {
+          await _waitForServiceState(true);
+        }
         return OperationResult(
           success: result.success,
           message: result.message,
@@ -168,6 +173,9 @@ class AListController extends ChangeNotifier {
       label: '正在停止 AList…',
       action: () async {
         final result = await _nativeApi.stopService();
+        if (result.success) {
+          await _waitForServiceState(false);
+        }
         return OperationResult(
           success: result.success,
           message: result.message,
@@ -418,6 +426,7 @@ class AListController extends ChangeNotifier {
 
     if (event.status != null) {
       status = event.status!;
+      _resolveServiceTransitionIfNeeded();
       shouldNotify = true;
     }
 
@@ -428,6 +437,36 @@ class AListController extends ChangeNotifier {
 
     if (shouldNotify) {
       notifyListeners();
+    }
+  }
+
+  Future<void> _waitForServiceState(bool running) {
+    if (status.running == running) {
+      _pendingRunningState = null;
+      _serviceTransitionCompleter = null;
+      return Future<void>.value();
+    }
+
+    _pendingRunningState = running;
+    final completer = Completer<void>();
+    _serviceTransitionCompleter = completer;
+    return completer.future;
+  }
+
+  void _resolveServiceTransitionIfNeeded() {
+    final expected = _pendingRunningState;
+    final completer = _serviceTransitionCompleter;
+    if (expected == null || completer == null) {
+      return;
+    }
+    if (status.running != expected) {
+      return;
+    }
+
+    _pendingRunningState = null;
+    _serviceTransitionCompleter = null;
+    if (!completer.isCompleted) {
+      completer.complete();
     }
   }
 
