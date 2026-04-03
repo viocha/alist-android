@@ -91,6 +91,14 @@ class MainActivity : FlutterActivity() {
             }
             "requestNotificationPermission" -> requestNotificationPermission(result)
             "openBatterySettings" -> openBatterySettings(result)
+            "openInBrowser" -> {
+                val url = call.argument<String>("url")
+                if (url.isNullOrBlank()) {
+                    result.error("bad_args", "url is required", null)
+                    return
+                }
+                openInBrowser(url, result)
+            }
             "startService" -> {
                 val port = call.argument<Int>("port") ?: 5244
                 val intent = Intent(applicationContext, AListForegroundService::class.java).apply {
@@ -253,6 +261,47 @@ class MainActivity : FlutterActivity() {
                 "shouldNotify" to false,
             ),
         )
+    }
+
+    private fun openInBrowser(url: String, result: MethodChannel.Result) {
+        val browserIntent = Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse(url)
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        }
+        val resolvedActivity = browserIntent.resolveActivity(packageManager)
+        if (resolvedActivity == null) {
+            result.success(
+                mapOf(
+                    "success" to false,
+                    "message" to "未找到可用的浏览器来打开 $url",
+                    "shouldNotify" to true,
+                ),
+            )
+            return
+        }
+
+        val chooserIntent = Intent.createChooser(browserIntent, "打开 AList").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        try {
+            applicationContext.startActivity(chooserIntent)
+            result.success(
+                mapOf(
+                    "success" to true,
+                    "message" to "已在浏览器中打开 $url",
+                    "shouldNotify" to false,
+                ),
+            )
+        } catch (_: Exception) {
+            result.success(
+                mapOf(
+                    "success" to false,
+                    "message" to "无法在浏览器中打开 $url",
+                    "shouldNotify" to true,
+                ),
+            )
+        }
     }
 
     companion object {

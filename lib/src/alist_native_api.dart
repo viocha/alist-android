@@ -39,8 +39,9 @@ class AListNativeApi {
   }
 
   Future<OperationResult> initializeDataDirectory() async {
-    final map =
-        await _channel.invokeMapMethod<Object?, Object?>('initializeDataDirectory');
+    final map = await _channel.invokeMapMethod<Object?, Object?>(
+      'initializeDataDirectory',
+    );
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
@@ -52,21 +53,16 @@ class AListNativeApi {
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
-  Future<OperationResult> startService({
-    required int port,
-  }) async {
+  Future<OperationResult> startService({required int port}) async {
     final map = await _channel.invokeMapMethod<Object?, Object?>(
       'startService',
-      <String, Object?>{
-        'port': port,
-      },
+      <String, Object?>{'port': port},
     );
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
   Future<OperationResult> stopService() async {
-    final map =
-        await _channel.invokeMapMethod<Object?, Object?>('stopService');
+    final map = await _channel.invokeMapMethod<Object?, Object?>('stopService');
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
@@ -76,10 +72,7 @@ class AListNativeApi {
   }) async {
     final map = await _channel.invokeMapMethod<Object?, Object?>(
       'updateServiceNotification',
-      <String, Object?>{
-        'port': port,
-        'message': message,
-      },
+      <String, Object?>{'port': port, 'message': message},
     );
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
@@ -92,14 +85,24 @@ class AListNativeApi {
   }
 
   Future<OperationResult> openBatterySettings() async {
-    final map =
-        await _channel.invokeMapMethod<Object?, Object?>('openBatterySettings');
+    final map = await _channel.invokeMapMethod<Object?, Object?>(
+      'openBatterySettings',
+    );
+    return OperationResult.fromMap(map ?? const <Object?, Object?>{});
+  }
+
+  Future<OperationResult> openInBrowser(String url) async {
+    final map = await _channel.invokeMapMethod<Object?, Object?>(
+      'openInBrowser',
+      <String, Object?>{'url': url},
+    );
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
   Stream<AListRuntimeEvent> watchRuntimeEvents() {
     return _events.receiveBroadcastStream().map((event) {
-      final map = (event as Map<Object?, Object?>?) ?? const <Object?, Object?>{};
+      final map =
+          (event as Map<Object?, Object?>?) ?? const <Object?, Object?>{};
       return AListRuntimeEvent.fromMap(map);
     });
   }

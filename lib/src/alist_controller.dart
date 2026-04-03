@@ -17,42 +17,25 @@ class AListController extends ChangeNotifier {
   AListController({
     AListNativeApi? nativeApi,
     RuntimeDownloader? runtimeDownloader,
-  })  : _nativeApi = nativeApi ?? AListNativeApi(),
-        _runtimeDownloader = runtimeDownloader ?? RuntimeDownloader();
+  }) : _nativeApi = nativeApi ?? AListNativeApi(),
+       _runtimeDownloader = runtimeDownloader ?? RuntimeDownloader();
 
   static const String _prefsPortKey = 'preferred_port';
   static const String _prefsPasswordKey = 'preferred_admin_password';
-  static const String _prefsLastAppliedPasswordKey = 'last_applied_admin_password';
-  static const String _prefsPasswordInitializedKey = 'admin_password_initialized';
+  static const String _prefsLastAppliedPasswordKey =
+      'last_applied_admin_password';
+  static const String _prefsPasswordInitializedKey =
+      'admin_password_initialized';
   static const int _tokenExpiresInHours = 876000;
   static const int maxVisibleLogLines = 300;
-  static final RegExp _ansiEscapePattern =
-      RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]');
-  static final RegExp _controlCharsPattern =
-      RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]');
+  static final RegExp _ansiEscapePattern = RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]');
+  static final RegExp _controlCharsPattern = RegExp(
+    r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]',
+  );
   static final RegExp _logLevelPrefixPattern = RegExp(
     r'^(?:\[(?:stdout|stderr)\]\s+)?(?:INFO|WARN|ERRO|FATA|DEBU|TRAC|PANI)\[[^\]]+\]\s*',
     multiLine: true,
   );
-  static final RegExp _timestampPrefixPattern = RegExp(
-    r'^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\s*',
-  );
-  static final List<RegExp> _importantLogPatterns = <RegExp>[
-    RegExp(r'\bwarn(?:ing)?\b', caseSensitive: false),
-    RegExp(r'\berr(?:or|o)?\b', caseSensitive: false),
-    RegExp(r'\bfail(?:ed|ure)?\b', caseSensitive: false),
-    RegExp(r'\bfatal\b', caseSensitive: false),
-    RegExp(r'\bpanic\b', caseSensitive: false),
-    RegExp(r'\bexception\b', caseSensitive: false),
-    RegExp(r'\brefused\b', caseSensitive: false),
-    RegExp(r'\bdenied\b', caseSensitive: false),
-    RegExp(r'\btimeout\b', caseSensitive: false),
-    RegExp(r'\btimed out\b', caseSensitive: false),
-    RegExp(r'\balready in use\b', caseSensitive: false),
-    RegExp(r'\bmissing\b', caseSensitive: false),
-    RegExp(r'\bunable\b', caseSensitive: false),
-    RegExp(r"\bcan't\b", caseSensitive: false),
-  ];
 
   final AListNativeApi _nativeApi;
   final RuntimeDownloader _runtimeDownloader;
@@ -278,10 +261,7 @@ class AListController extends ChangeNotifier {
           );
         }
 
-        return OperationResult(
-          success: true,
-          message: '配置文件已导出到 $savedPath',
-        );
+        return OperationResult(success: true, message: '配置文件已导出到 $savedPath');
       },
     );
   }
@@ -320,6 +300,18 @@ class AListController extends ChangeNotifier {
     return _nativeApi.openBatterySettings();
   }
 
+  Future<OperationResult> openAListInBrowser() async {
+    final port = status.port ?? _parsePort();
+    if (port == null) {
+      return const OperationResult(
+        success: false,
+        message: '当前端口无效，无法打开 AList。',
+      );
+    }
+
+    return _nativeApi.openInBrowser('http://localhost:$port');
+  }
+
   Future<OperationResult> applyAdminPassword() async {
     final password = adminPassword.trim();
     if (password.isEmpty) {
@@ -337,10 +329,7 @@ class AListController extends ChangeNotifier {
       );
     }
     if (status.running) {
-      return const OperationResult(
-        success: false,
-        message: '请先停止服务，再修改管理员密码。',
-      );
+      return const OperationResult(success: false, message: '请先停止服务，再修改管理员密码。');
     }
 
     return _runBusy(
@@ -409,7 +398,10 @@ class AListController extends ChangeNotifier {
   Future<OperationResult> _installRuntimeInternal({required bool force}) async {
     final currentPaths = paths;
     if (currentPaths == null) {
-      return const OperationResult(success: false, message: 'Native paths are not ready.');
+      return const OperationResult(
+        success: false,
+        message: 'Native paths are not ready.',
+      );
     }
 
     final metadata = await _runtimeDownloader.ensureLatestRuntime(
@@ -421,7 +413,9 @@ class AListController extends ChangeNotifier {
         notifyListeners();
       },
     );
-    final executable = await _nativeApi.ensureBinaryExecutable(currentPaths.binaryPath);
+    final executable = await _nativeApi.ensureBinaryExecutable(
+      currentPaths.binaryPath,
+    );
     if (!executable) {
       return const OperationResult(
         success: false,
@@ -495,7 +489,8 @@ class AListController extends ChangeNotifier {
       }
     } finally {
       _autoSaveInProgress = false;
-      autoSavePending = _autoSaveCompletedRevision != _autoSaveRequestedRevision;
+      autoSavePending =
+          _autoSaveCompletedRevision != _autoSaveRequestedRevision;
       notifyListeners();
     }
   }
@@ -573,10 +568,7 @@ class AListController extends ChangeNotifier {
 
     _lastSyncedNotificationMessage = message;
     unawaited(
-      _nativeApi.updateServiceNotification(
-        port: port,
-        message: message,
-      ),
+      _nativeApi.updateServiceNotification(port: port, message: message),
     );
   }
 
@@ -605,9 +597,9 @@ class AListController extends ChangeNotifier {
       if (!initializeResult.success && !await configFile.exists()) {
         await configFile.parent.create(recursive: true);
         await configFile.writeAsString(
-          const JsonEncoder.withIndent('  ').convert(
-            _buildDefaultConfig(currentPaths, port),
-          ),
+          const JsonEncoder.withIndent(
+            '  ',
+          ).convert(_buildDefaultConfig(currentPaths, port)),
           flush: true,
         );
       }
@@ -715,11 +707,7 @@ class AListController extends ChangeNotifier {
         'allow_methods': const <String>['*'],
         'allow_headers': const <String>['*'],
       },
-      's3': <String, Object?>{
-        'enable': false,
-        'port': 5246,
-        'ssl': false,
-      },
+      's3': <String, Object?>{'enable': false, 'port': 5246, 'ssl': false},
       'ftp': <String, Object?>{
         'enable': false,
         'listen': ':5221',
@@ -732,10 +720,7 @@ class AListController extends ChangeNotifier {
         'enable_active_conn_ip_check': true,
         'enable_pasv_conn_ip_check': true,
       },
-      'sftp': <String, Object?>{
-        'enable': false,
-        'listen': ':5222',
-      },
+      'sftp': <String, Object?>{'enable': false, 'listen': ':5222'},
       'last_launched_version': '',
     };
   }
@@ -819,7 +804,10 @@ class AListController extends ChangeNotifier {
 
   Future<OperationResult> _ensureNotificationPermission() async {
     if (!Platform.isAndroid) {
-      return const OperationResult(success: true, message: 'Notification permission not needed.');
+      return const OperationResult(
+        success: true,
+        message: 'Notification permission not needed.',
+      );
     }
     return _nativeApi.requestNotificationPermission();
   }
@@ -868,26 +856,8 @@ class AListController extends ChangeNotifier {
         .replaceAll(_controlCharsPattern, '')
         .split('\n')
         .map((line) => line.replaceAll(_logLevelPrefixPattern, '').trim())
-        .where(_isImportantLogLine)
+        .where((line) => line.isNotEmpty)
         .join('\n')
         .trim();
-  }
-
-  static bool _isImportantLogLine(String line) {
-    if (line.isEmpty) {
-      return false;
-    }
-
-    final normalized = line.replaceFirst(_timestampPrefixPattern, '').trim();
-    if (normalized.isEmpty) {
-      return false;
-    }
-
-    for (final pattern in _importantLogPatterns) {
-      if (pattern.hasMatch(normalized)) {
-        return true;
-      }
-    }
-    return false;
   }
 }

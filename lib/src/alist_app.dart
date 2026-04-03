@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'alist_controller.dart';
 import 'alist_models.dart';
 import 'runtime_downloader.dart';
+
 class AListApp extends StatefulWidget {
   const AListApp({super.key});
 
@@ -47,7 +48,9 @@ class _AListAppState extends State<AListApp> {
         _portTextController.text != _controller.portInput) {
       _portTextController.value = _portTextController.value.copyWith(
         text: _controller.portInput,
-        selection: TextSelection.collapsed(offset: _controller.portInput.length),
+        selection: TextSelection.collapsed(
+          offset: _controller.portInput.length,
+        ),
       );
     }
 
@@ -67,7 +70,9 @@ class _AListAppState extends State<AListApp> {
         if (!_logScrollController.hasClients) {
           return;
         }
-        _logScrollController.jumpTo(_logScrollController.position.maxScrollExtent);
+        _logScrollController.jumpTo(
+          _logScrollController.position.maxScrollExtent,
+        );
       });
     }
   }
@@ -88,8 +93,9 @@ class _AListAppState extends State<AListApp> {
       ..showSnackBar(
         SnackBar(
           content: Text(result.message),
-          backgroundColor:
-              result.success ? const Color(0xFF165D49) : const Color(0xFFB42318),
+          backgroundColor: result.success
+              ? const Color(0xFF165D49)
+              : const Color(0xFFB42318),
         ),
       );
   }
@@ -172,7 +178,8 @@ class _AListHomePage extends StatelessWidget {
   final FocusNode portFocusNode;
   final FocusNode passwordFocusNode;
   final ScrollController logScrollController;
-  final Future<void> Function(Future<OperationResult> Function() action) onAction;
+  final Future<void> Function(Future<OperationResult> Function() action)
+  onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -188,9 +195,9 @@ class _AListHomePage extends StatelessWidget {
           children: [
             Text(
               'AList',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -242,6 +249,9 @@ class _AListHomePage extends StatelessWidget {
                       message: status.lastMessage,
                       versionLabel:
                           runtime?.tagName ?? RuntimeDownloader.bundledVersion,
+                      onOpenInBrowser: status.running
+                          ? () => onAction(controller.openAListInBrowser)
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     Card(
@@ -252,9 +262,8 @@ class _AListHomePage extends StatelessWidget {
                           children: [
                             Text(
                               '服务控制',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 18),
                             TextField(
@@ -301,7 +310,9 @@ class _AListHomePage extends StatelessWidget {
                               children: [
                                 OutlinedButton(
                                   onPressed: controller.canApplyAdminPassword
-                                      ? () => onAction(controller.applyAdminPassword)
+                                      ? () => onAction(
+                                          controller.applyAdminPassword,
+                                        )
                                       : null,
                                   style: OutlinedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
@@ -316,27 +327,35 @@ class _AListHomePage extends StatelessWidget {
                                     ? OutlinedButton.icon(
                                         onPressed: busy
                                             ? null
-                                            : () => onAction(controller.toggleService),
+                                            : () => onAction(
+                                                controller.toggleService,
+                                              ),
                                         style: OutlinedButton.styleFrom(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 18,
                                             vertical: 12,
                                           ),
                                         ),
-                                        icon: const Icon(Icons.stop_circle_outlined),
+                                        icon: const Icon(
+                                          Icons.stop_circle_outlined,
+                                        ),
                                         label: const Text('停止服务'),
                                       )
                                     : FilledButton.icon(
                                         onPressed: busy
                                             ? null
-                                            : () => onAction(controller.toggleService),
+                                            : () => onAction(
+                                                controller.toggleService,
+                                              ),
                                         style: FilledButton.styleFrom(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 18,
                                             vertical: 12,
                                           ),
                                         ),
-                                        icon: const Icon(Icons.play_arrow_rounded),
+                                        icon: const Icon(
+                                          Icons.play_arrow_rounded,
+                                        ),
                                         label: const Text('启动服务'),
                                       ),
                               ],
@@ -367,7 +386,9 @@ class _AListHomePage extends StatelessWidget {
                                   onPressed: busy
                                       ? null
                                       : () => onAction(controller.clearLogs),
-                                  icon: const Icon(Icons.cleaning_services_outlined),
+                                  icon: const Icon(
+                                    Icons.cleaning_services_outlined,
+                                  ),
                                   label: const Text('清空'),
                                 ),
                               ],
@@ -380,16 +401,18 @@ class _AListHomePage extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFAFAF7),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFFE6E4DB)),
+                                border: Border.all(
+                                  color: const Color(0xFFE6E4DB),
+                                ),
                               ),
                               child: SingleChildScrollView(
                                 controller: logScrollController,
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 child: SelectableText(
-                                  controller.logs.isEmpty ? '暂无日志。' : controller.logs,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
+                                  controller.logs.isEmpty
+                                      ? '暂无日志。'
+                                      : controller.logs,
+                                  style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         fontFamily: 'monospace',
                                         height: 1.4,
@@ -416,11 +439,13 @@ class _StatusHero extends StatelessWidget {
     required this.running,
     required this.message,
     required this.versionLabel,
+    required this.onOpenInBrowser,
   });
 
   final bool running;
   final String message;
   final String versionLabel;
+  final VoidCallback? onOpenInBrowser;
 
   @override
   Widget build(BuildContext context) {
@@ -454,7 +479,9 @@ class _StatusHero extends StatelessWidget {
                 width: 14,
                 height: 14,
                 decoration: BoxDecoration(
-                  color: running ? const Color(0xFF86EFAC) : const Color(0xFFF79009),
+                  color: running
+                      ? const Color(0xFF86EFAC)
+                      : const Color(0xFFF79009),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -462,18 +489,18 @@ class _StatusHero extends StatelessWidget {
               Text(
                 running ? '服务运行中' : '服务未启动',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Text(
             message,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: secondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: secondary),
           ),
           const SizedBox(height: 18),
           Wrap(
@@ -481,6 +508,11 @@ class _StatusHero extends StatelessWidget {
             runSpacing: 10,
             children: [
               _TagChip(label: 'AList $versionLabel', foreground: foreground),
+              if (running && onOpenInBrowser != null)
+                _ActionChipButton(
+                  label: '打开 AList',
+                  onPressed: onOpenInBrowser!,
+                ),
             ],
           ),
         ],
@@ -490,10 +522,7 @@ class _StatusHero extends StatelessWidget {
 }
 
 class _TagChip extends StatelessWidget {
-  const _TagChip({
-    required this.label,
-    required this.foreground,
-  });
+  const _TagChip({required this.label, required this.foreground});
 
   final String label;
   final Color foreground;
@@ -509,16 +538,53 @@ class _TagChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w600,
-            ),
+          color: foreground,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
 }
 
-enum _MenuAction {
-  batterySettings,
-  importConfig,
-  exportConfig,
+class _ActionChipButton extends StatelessWidget {
+  const _ActionChipButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    const actionColor = Color(0xFF0F766E);
+    return Material(
+      color: Colors.white,
+      shape: const StadiumBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.open_in_browser_outlined,
+                size: 14,
+                color: actionColor,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: actionColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+enum _MenuAction { batterySettings, importConfig, exportConfig }
