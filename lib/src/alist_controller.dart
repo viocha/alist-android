@@ -292,6 +292,10 @@ class AListController extends ChangeNotifier {
     return startService();
   }
 
+  Future<OperationResult> openBatterySettings() async {
+    return _nativeApi.openBatterySettings();
+  }
+
   void setPortInput(String value) {
     portInput = value;
     _scheduleAutoSave();

@@ -3,9 +3,11 @@ package com.viocha.alist_android
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -88,6 +90,7 @@ class MainActivity : FlutterActivity() {
                 result.success(commandResult.toMap())
             }
             "requestNotificationPermission" -> requestNotificationPermission(result)
+            "openBatterySettings" -> openBatterySettings(result)
             "startService" -> {
                 val port = call.argument<Int>("port") ?: 5244
                 val password = call.argument<String>("password") ?: ""
@@ -186,6 +189,54 @@ class MainActivity : FlutterActivity() {
             this,
             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
             NOTIFICATION_PERMISSION_REQUEST_CODE,
+        )
+    }
+
+    private fun openBatterySettings(result: MethodChannel.Result) {
+        val packageName = applicationContext.packageName
+        val intents = listOf(
+            Intent().apply {
+                setClassName(
+                    "com.miui.securitycenter",
+                    "com.miui.powercenter.legacypowerrank.PowerDetailActivity",
+                )
+                putExtra("package_name", packageName)
+                putExtra("packageName", packageName)
+                putExtra("android.provider.extra.APP_PACKAGE", packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            Intent("android.settings.APP_BATTERY_SETTINGS").apply {
+                putExtra("android.provider.extra.APP_PACKAGE", packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+
+        val launched = intents.firstOrNull { intent ->
+            intent.resolveActivity(packageManager) != null
+        }
+
+        if (launched == null) {
+            result.success(
+                mapOf(
+                    "success" to false,
+                    "message" to "无法打开电池策略设置。",
+                    "shouldNotify" to false,
+                ),
+            )
+            return
+        }
+
+        startActivity(launched)
+        result.success(
+            mapOf(
+                "success" to true,
+                "message" to "已打开电池策略设置。",
+                "shouldNotify" to false,
+            ),
         )
     }
 

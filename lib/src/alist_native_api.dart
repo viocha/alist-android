@@ -79,6 +79,12 @@ class AListNativeApi {
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
+  Future<OperationResult> openBatterySettings() async {
+    final map =
+        await _channel.invokeMapMethod<Object?, Object?>('openBatterySettings');
+    return OperationResult.fromMap(map ?? const <Object?, Object?>{});
+  }
+
   Stream<AListRuntimeEvent> watchRuntimeEvents() {
     return _events.receiveBroadcastStream().map((event) {
       final map = (event as Map<Object?, Object?>?) ?? const <Object?, Object?>{};

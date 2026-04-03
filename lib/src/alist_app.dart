@@ -200,6 +200,9 @@ class _AListHomePage extends StatelessWidget {
             position: PopupMenuPosition.under,
             onSelected: (action) {
               switch (action) {
+                case _MenuAction.batterySettings:
+                  onAction(controller.openBatterySettings);
+                  break;
                 case _MenuAction.importConfig:
                   onAction(controller.importConfig);
                   break;
@@ -209,6 +212,10 @@ class _AListHomePage extends StatelessWidget {
               }
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _MenuAction.batterySettings,
+                child: Text('电池策略'),
+              ),
               PopupMenuItem(
                 value: _MenuAction.importConfig,
                 child: Text('导入配置'),
@@ -494,6 +501,7 @@ class _TagChip extends StatelessWidget {
 }
 
 enum _MenuAction {
+  batterySettings,
   importConfig,
   exportConfig,
 }
