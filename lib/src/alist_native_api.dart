@@ -84,6 +84,13 @@ class AListNativeApi {
     return OperationResult.fromMap(map ?? const <Object?, Object?>{});
   }
 
+  Future<OperationResult> openStoragePermissionSettings() async {
+    final map = await _channel.invokeMapMethod<Object?, Object?>(
+      'openStoragePermissionSettings',
+    );
+    return OperationResult.fromMap(map ?? const <Object?, Object?>{});
+  }
+
   Future<OperationResult> openBatterySettings() async {
     final map = await _channel.invokeMapMethod<Object?, Object?>(
       'openBatterySettings',

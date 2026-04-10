@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 class AListForegroundService : Service() {
     private var cpuWakeLock: PowerManager.WakeLock? = null
@@ -32,10 +34,7 @@ class AListForegroundService : Service() {
                 val port = (status["port"] as? Number)?.toInt() ?: 5244
                 if (running) {
                     acquireRuntimeLocks()
-                    startForeground(
-                        NOTIFICATION_ID,
-                        buildNotification("服务运行中，端口 $port", port),
-                    )
+                    updateForegroundNotification(port, "服务运行中")
                     return START_STICKY
                 }
                 stopServiceNotification()
@@ -44,12 +43,8 @@ class AListForegroundService : Service() {
 
             ACTION_UPDATE_NOTIFICATION -> {
                 val port = intent.getIntExtra(EXTRA_PORT, 5244)
-                val message =
-                    intent.getStringExtra(EXTRA_MESSAGE) ?: "服务运行中，端口 $port"
-                notificationManager().notify(
-                    NOTIFICATION_ID,
-                    buildNotification(message, port),
-                )
+                val message = intent.getStringExtra(EXTRA_MESSAGE) ?: "服务运行中"
+                updateForegroundNotification(port, message)
                 return START_STICKY
             }
 
@@ -57,6 +52,7 @@ class AListForegroundService : Service() {
                 val port = intent.getIntExtra(EXTRA_PORT, 5244)
 
                 acquireRuntimeLocks()
+                updateForegroundNotification(port, "正在启动服务…")
 
                 val startResult = AListRuntime.start(applicationContext, port) {
                     stopServiceNotification()
@@ -66,6 +62,7 @@ class AListForegroundService : Service() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                updateForegroundNotification(port, "服务运行中")
                 return START_STICKY
             }
 
@@ -84,6 +81,7 @@ class AListForegroundService : Service() {
     }
 
     private fun buildNotification(content: String, port: Int): Notification {
+        val accessUrls = resolveLocalAccessUrls(port)
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -114,10 +112,27 @@ class AListForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val collapsedText =
+            when {
+                accessUrls.isNotEmpty() -> accessUrls.first()
+                else -> "端口 $port"
+            }
+        val expandedText =
+            if (accessUrls.isEmpty()) {
+                "局域网访问地址暂不可用"
+            } else {
+                accessUrls.joinToString(separator = "\n")
+            }
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload_done)
             .setContentTitle("AList")
-            .setContentText(content)
+            .setContentText(collapsedText)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(expandedText)
+                    .setSummaryText("AList 服务"),
+            )
             .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
@@ -126,6 +141,13 @@ class AListForegroundService : Service() {
             .setDeleteIntent(restorePendingIntent)
             .addAction(android.R.drawable.ic_media_pause, "停止", stopPendingIntent)
             .build()
+    }
+
+    private fun updateForegroundNotification(port: Int, content: String) {
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(content, port),
+        )
     }
 
     private fun createNotificationChannel() {
@@ -181,6 +203,73 @@ class AListForegroundService : Service() {
             }
         }
         cpuWakeLock = null
+    }
+
+    private fun resolveLocalAccessUrls(port: Int): List<String> {
+        val privateHosts = linkedSetOf<String>()
+        val fallbackHosts = linkedSetOf<String>()
+
+        NetworkInterface.getNetworkInterfaces()?.toList()?.forEach { networkInterface ->
+            if (!networkInterface.isUp || networkInterface.isLoopback) {
+                return@forEach
+            }
+
+            networkInterface.inetAddresses.toList().forEach { address ->
+                val inet4Address = address as? Inet4Address ?: return@forEach
+                val host = inet4Address.hostAddress ?: return@forEach
+                if (host.startsWith("127.") || host.startsWith("169.254.")) {
+                    return@forEach
+                }
+
+                if (isPrivateIpv4(host)) {
+                    privateHosts.add(host)
+                } else {
+                    fallbackHosts.add(host)
+                }
+            }
+        }
+
+        val selectedHosts = if (privateHosts.isNotEmpty()) privateHosts else fallbackHosts
+        return selectedHosts
+            .sortedWith(::compareIpv4Hosts)
+            .map { host -> "http://$host:$port" }
+    }
+
+    private fun isPrivateIpv4(host: String): Boolean {
+        val octets = host.split(".").mapNotNull { part -> part.toIntOrNull() }
+        if (octets.size != 4) {
+            return false
+        }
+
+        val a = octets[0]
+        val b = octets[1]
+        return a == 10 || (a == 172 && b in 16..31) || (a == 192 && b == 168)
+    }
+
+    private fun compareIpv4Hosts(left: String, right: String): Int {
+        val rankDiff = ipv4SortRank(left) - ipv4SortRank(right)
+        if (rankDiff != 0) {
+            return rankDiff
+        }
+
+        val leftOctets = left.split(".").map { it.toInt() }
+        val rightOctets = right.split(".").map { it.toInt() }
+        for (index in 0..3) {
+            val diff = leftOctets[index] - rightOctets[index]
+            if (diff != 0) {
+                return diff
+            }
+        }
+        return 0
+    }
+
+    private fun ipv4SortRank(host: String): Int {
+        return when {
+            host.startsWith("192.168.") -> 0
+            host.startsWith("172.") -> 1
+            host.startsWith("10.") -> 2
+            else -> 3
+        }
     }
 
     companion object {

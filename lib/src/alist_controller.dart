@@ -55,6 +55,8 @@ class AListController extends ChangeNotifier {
   String busyMessage = '';
   double? busyProgress;
   String logs = '';
+  bool localAccessUrlsRefreshing = false;
+  List<String> localAccessUrls = const <String>[];
   String portInput = '5244';
   String adminPassword = '';
   String lastAppliedAdminPassword = '';
@@ -109,6 +111,11 @@ class AListController extends ChangeNotifier {
       status = await _nativeApi.getStatus();
       logs = _trimLogs(await _nativeApi.readLogs());
       installedRuntime ??= await _readRuntimeMetadata();
+      if (status.running) {
+        await _refreshLocalAccessUrls(showLoading: false, notify: false);
+      } else {
+        localAccessUrls = const <String>[];
+      }
     } finally {
       _refreshing = false;
       notifyListeners();
@@ -156,6 +163,7 @@ class AListController extends ChangeNotifier {
         final result = await _nativeApi.startService(port: port);
         if (result.success) {
           await _waitForServiceState(true);
+          await _refreshLocalAccessUrls(showLoading: false);
         }
         return OperationResult(
           success: result.success,
@@ -173,6 +181,7 @@ class AListController extends ChangeNotifier {
         final result = await _nativeApi.stopService();
         if (result.success) {
           await _waitForServiceState(false);
+          localAccessUrls = const <String>[];
         }
         return OperationResult(
           success: result.success,
@@ -298,6 +307,48 @@ class AListController extends ChangeNotifier {
 
   Future<OperationResult> openBatterySettings() async {
     return _nativeApi.openBatterySettings();
+  }
+
+  Future<OperationResult> openStoragePermissionSettings() async {
+    return _nativeApi.openStoragePermissionSettings();
+  }
+
+  Future<OperationResult> refreshLocalAccessUrls() async {
+    if (!status.running) {
+      localAccessUrls = const <String>[];
+      notifyListeners();
+      return const OperationResult(
+        success: true,
+        message: '',
+        shouldNotify: false,
+      );
+    }
+
+    final port = status.port ?? _parsePort();
+    if (port == null) {
+      return const OperationResult(
+        success: false,
+        message: '当前端口无效，无法刷新局域网地址。',
+      );
+    }
+
+    localAccessUrlsRefreshing = true;
+    notifyListeners();
+
+    try {
+      localAccessUrls = await _resolveLocalAccessUrls(port);
+      return const OperationResult(
+        success: true,
+        message: '',
+        shouldNotify: false,
+      );
+    } catch (error) {
+      localAccessUrls = const <String>[];
+      return OperationResult(success: false, message: '刷新局域网地址失败：$error');
+    } finally {
+      localAccessUrlsRefreshing = false;
+      notifyListeners();
+    }
   }
 
   Future<OperationResult> openAListInBrowser() async {
@@ -505,9 +556,16 @@ class AListController extends ChangeNotifier {
     var shouldNotify = false;
 
     if (event.status != null) {
+      final previousRunning = status.running;
+      final previousPort = status.port;
       status = event.status!;
       _syncRunningNotificationIfNeeded();
       _resolveServiceTransitionIfNeeded();
+      if (!status.running) {
+        localAccessUrls = const <String>[];
+      } else if (!previousRunning || previousPort != status.port) {
+        unawaited(_refreshLocalAccessUrls(showLoading: false));
+      }
       shouldNotify = true;
     }
 
@@ -859,5 +917,112 @@ class AListController extends ChangeNotifier {
         .where((line) => line.isNotEmpty)
         .join('\n')
         .trim();
+  }
+
+  Future<void> _refreshLocalAccessUrls({
+    required bool showLoading,
+    bool notify = true,
+  }) async {
+    if (localAccessUrlsRefreshing) {
+      return;
+    }
+
+    final port = status.port ?? _parsePort();
+    if (port == null || !status.running) {
+      localAccessUrls = const <String>[];
+      if (notify) {
+        notifyListeners();
+      }
+      return;
+    }
+
+    localAccessUrlsRefreshing = true;
+    if (notify) {
+      notifyListeners();
+    }
+
+    try {
+      localAccessUrls = await _resolveLocalAccessUrls(port);
+    } catch (_) {
+      localAccessUrls = const <String>[];
+    } finally {
+      localAccessUrlsRefreshing = false;
+      if (notify || showLoading) {
+        notifyListeners();
+      }
+    }
+  }
+
+  bool _isPrivateIpv4(String host) {
+    final octets = host.split('.').map(int.tryParse).toList(growable: false);
+    if (octets.length != 4 || octets.any((value) => value == null)) {
+      return false;
+    }
+
+    final a = octets[0]!;
+    final b = octets[1]!;
+    return a == 10 ||
+        (a == 172 && b >= 16 && b <= 31) ||
+        (a == 192 && b == 168);
+  }
+
+  int _compareIpv4Addresses(String left, String right) {
+    final rankDiff = _ipv4SortRank(left) - _ipv4SortRank(right);
+    if (rankDiff != 0) {
+      return rankDiff;
+    }
+
+    final leftOctets = left.split('.').map(int.parse).toList(growable: false);
+    final rightOctets = right.split('.').map(int.parse).toList(growable: false);
+    for (var index = 0; index < 4; index += 1) {
+      final diff = leftOctets[index] - rightOctets[index];
+      if (diff != 0) {
+        return diff;
+      }
+    }
+    return 0;
+  }
+
+  int _ipv4SortRank(String host) {
+    if (host.startsWith('192.168.')) {
+      return 0;
+    }
+    if (host.startsWith('172.')) {
+      return 1;
+    }
+    if (host.startsWith('10.')) {
+      return 2;
+    }
+    return 3;
+  }
+
+  Future<List<String>> _resolveLocalAccessUrls(int port) async {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+      includeLinkLocal: false,
+    );
+    final privateHosts = <String>{};
+    final fallbackHosts = <String>{};
+
+    for (final interface in interfaces) {
+      for (final address in interface.addresses) {
+        final host = address.address;
+        if (_isPrivateIpv4(host)) {
+          privateHosts.add(host);
+        } else {
+          fallbackHosts.add(host);
+        }
+      }
+    }
+
+    final selectedHosts = privateHosts.isNotEmpty
+        ? privateHosts
+        : fallbackHosts;
+    final sortedHosts = selectedHosts.toList(growable: false)
+      ..sort(_compareIpv4Addresses);
+    return sortedHosts
+        .map((host) => 'http://$host:$port')
+        .toList(growable: false);
   }
 }

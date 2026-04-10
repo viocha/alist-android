@@ -210,6 +210,9 @@ class _AListHomePage extends StatelessWidget {
                 case _MenuAction.batterySettings:
                   onAction(controller.openBatterySettings);
                   break;
+                case _MenuAction.storagePermission:
+                  onAction(controller.openStoragePermissionSettings);
+                  break;
                 case _MenuAction.importConfig:
                   onAction(controller.importConfig);
                   break;
@@ -219,6 +222,10 @@ class _AListHomePage extends StatelessWidget {
               }
             },
             itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _MenuAction.storagePermission,
+                child: Text('文件权限'),
+              ),
               PopupMenuItem(
                 value: _MenuAction.batterySettings,
                 child: Text('电池策略'),
@@ -249,8 +256,14 @@ class _AListHomePage extends StatelessWidget {
                       message: status.lastMessage,
                       versionLabel:
                           runtime?.tagName ?? RuntimeDownloader.bundledVersion,
+                      localAccessUrls: controller.localAccessUrls,
+                      localAccessUrlsRefreshing:
+                          controller.localAccessUrlsRefreshing,
                       onOpenInBrowser: status.running
                           ? () => onAction(controller.openAListInBrowser)
+                          : null,
+                      onRefreshLocalAccessUrls: status.running
+                          ? () => onAction(controller.refreshLocalAccessUrls)
                           : null,
                     ),
                     const SizedBox(height: 16),
@@ -439,13 +452,19 @@ class _StatusHero extends StatelessWidget {
     required this.running,
     required this.message,
     required this.versionLabel,
+    required this.localAccessUrls,
+    required this.localAccessUrlsRefreshing,
     required this.onOpenInBrowser,
+    required this.onRefreshLocalAccessUrls,
   });
 
   final bool running;
   final String message;
   final String versionLabel;
+  final List<String> localAccessUrls;
+  final bool localAccessUrlsRefreshing;
   final VoidCallback? onOpenInBrowser;
+  final VoidCallback? onRefreshLocalAccessUrls;
 
   @override
   Widget build(BuildContext context) {
@@ -515,7 +534,111 @@ class _StatusHero extends StatelessWidget {
                 ),
             ],
           ),
+          if (running) ...[
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '局域网访问',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: foreground,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: localAccessUrlsRefreshing
+                            ? null
+                            : onRefreshLocalAccessUrls,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                        ),
+                        icon: localAccessUrlsRefreshing
+                            ? SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white.withValues(alpha: 0.92),
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('刷新'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (localAccessUrls.isEmpty)
+                    Text(
+                      localAccessUrlsRefreshing
+                          ? '正在刷新本机局域网地址…'
+                          : '未发现可用的局域网 IPv4 地址，可手动刷新后重试。',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: secondary),
+                    )
+                  else
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: localAccessUrls
+                          .map(
+                            (url) => Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: _AccessUrlRow(url: url),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _AccessUrlRow extends StatelessWidget {
+  const _AccessUrlRow({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SelectableText(
+        url,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          height: 1.35,
+        ),
       ),
     );
   }
@@ -587,4 +710,9 @@ class _ActionChipButton extends StatelessWidget {
   }
 }
 
-enum _MenuAction { batterySettings, importConfig, exportConfig }
+enum _MenuAction {
+  storagePermission,
+  batterySettings,
+  importConfig,
+  exportConfig,
+}

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Environment
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -17,7 +18,9 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private var pendingPermissionResult: MethodChannel.Result? = null
+    private var pendingNotificationPermissionResult: MethodChannel.Result? = null
+    private var pendingStoragePermissionResult: MethodChannel.Result? = null
+    private var awaitingManageStorageResult = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var runtimeEventSink: EventChannel.EventSink? = null
     private val runtimeObserver =
@@ -89,6 +92,9 @@ class MainActivity : FlutterActivity() {
                 val commandResult = AListRuntime.applyAdminPassword(applicationContext, password)
                 result.success(commandResult.toMap())
             }
+            "getStoragePermissionStatus" -> result.success(getStoragePermissionStatus())
+            "ensureStoragePermission" -> ensureStoragePermission(result)
+            "openStoragePermissionSettings" -> openStoragePermissionSettings(result)
             "requestNotificationPermission" -> requestNotificationPermission(result)
             "openBatterySettings" -> openBatterySettings(result)
             "openInBrowser" -> {
@@ -153,23 +159,54 @@ class MainActivity : FlutterActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
-        if (requestCode != NOTIFICATION_PERMISSION_REQUEST_CODE) {
+        when (requestCode) {
+            NOTIFICATION_PERMISSION_REQUEST_CODE -> {
+                val granted =
+                    grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                pendingNotificationPermissionResult?.success(
+                    mapOf(
+                        "success" to granted,
+                        "message" to if (granted) {
+                            "Notification permission granted."
+                        } else {
+                            "需要通知权限才能显示常驻服务通知。"
+                        },
+                    ),
+                )
+                pendingNotificationPermissionResult = null
+            }
+            STORAGE_PERMISSION_REQUEST_CODE -> {
+                val granted =
+                    grantResults.isNotEmpty() &&
+                        grantResults.all { grantResult ->
+                            grantResult == PackageManager.PERMISSION_GRANTED
+                        }
+                pendingStoragePermissionResult?.success(
+                    mapOf(
+                        "success" to granted,
+                        "message" to if (granted) {
+                            "已授予文件访问权限。"
+                        } else {
+                            "需要文件访问权限才能让 AList 读取本地存储内容。"
+                        },
+                    ),
+                )
+                pendingStoragePermissionResult = null
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        if (!awaitingManageStorageResult) {
             return
         }
 
-        val granted =
-            grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-        pendingPermissionResult?.success(
-            mapOf(
-                "success" to granted,
-                "message" to if (granted) {
-                    "Notification permission granted."
-                } else {
-                    "需要通知权限才能显示常驻服务通知。"
-                },
-            ),
-        )
-        pendingPermissionResult = null
+        awaitingManageStorageResult = false
+        val result = pendingStoragePermissionResult ?: return
+        pendingStoragePermissionResult = null
+        result.success(getStoragePermissionStatus())
     }
 
     private fun requestNotificationPermission(result: MethodChannel.Result) {
@@ -197,7 +234,7 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        if (pendingPermissionResult != null) {
+        if (pendingNotificationPermissionResult != null) {
             result.success(
                 mapOf(
                     "success" to false,
@@ -207,12 +244,125 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        pendingPermissionResult = result
+        pendingNotificationPermissionResult = result
         ActivityCompat.requestPermissions(
             this,
             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
             NOTIFICATION_PERMISSION_REQUEST_CODE,
         )
+    }
+
+    private fun getStoragePermissionStatus(): Map<String, Any> {
+        val granted = hasStoragePermission()
+        return mapOf(
+            "success" to granted,
+            "message" to if (granted) {
+                "已授予文件访问权限。"
+            } else {
+                "需要文件访问权限才能让 AList 访问本地存储。"
+            },
+            "shouldNotify" to false,
+        )
+    }
+
+    private fun ensureStoragePermission(result: MethodChannel.Result) {
+        if (hasStoragePermission()) {
+            result.success(
+                mapOf(
+                    "success" to true,
+                    "message" to "已授予文件访问权限。",
+                    "shouldNotify" to false,
+                ),
+            )
+            return
+        }
+
+        if (pendingStoragePermissionResult != null) {
+            result.success(
+                mapOf(
+                    "success" to false,
+                    "message" to "A permission request is already in progress.",
+                    "shouldNotify" to false,
+                ),
+            )
+            return
+        }
+
+        pendingStoragePermissionResult = result
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            awaitingManageStorageResult = true
+            startActivity(buildStoragePermissionIntent())
+            return
+        }
+
+        val permissions = buildList {
+            add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }.toTypedArray()
+
+        ActivityCompat.requestPermissions(
+            this,
+            permissions,
+            STORAGE_PERMISSION_REQUEST_CODE,
+        )
+    }
+
+    private fun openStoragePermissionSettings(result: MethodChannel.Result) {
+        startActivity(buildStoragePermissionIntent())
+        result.success(
+            mapOf(
+                "success" to true,
+                "message" to "已打开文件权限设置。",
+                "shouldNotify" to false,
+            ),
+        )
+    }
+
+    private fun hasStoragePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return Environment.isExternalStorageManager()
+        }
+
+        val readGranted =
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+            ) == PackageManager.PERMISSION_GRANTED
+        val writeGranted =
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            ) == PackageManager.PERMISSION_GRANTED
+        return readGranted && writeGranted
+    }
+
+    private fun buildStoragePermissionIntent(): Intent {
+        val packageUri = Uri.parse("package:$packageName")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = packageUri
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            val fallbackIntent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            return when {
+                intent.resolveActivity(packageManager) != null -> intent
+                fallbackIntent.resolveActivity(packageManager) != null -> fallbackIntent
+                else -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = packageUri
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            }
+        }
+
+        return Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = packageUri
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
     }
 
     private fun openBatterySettings(result: MethodChannel.Result) {
@@ -306,5 +456,6 @@ class MainActivity : FlutterActivity() {
         private const val EVENTS_CHANNEL_NAME = "com.viocha.alist_android/runtime_events"
         private const val DEFAULT_LOG_BYTES = 128 * 1024
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 2304
+        private const val STORAGE_PERMISSION_REQUEST_CODE = 2305
     }
 }
