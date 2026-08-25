@@ -36,9 +36,12 @@ class RuntimeDownloader {
     }
 
     if (!force && await metadataFile.exists()) {
-      final cachedMetadata =
-          RuntimeMetadata.tryParse(await metadataFile.readAsString());
-      if (cachedMetadata != null) {
+      final cachedMetadata = RuntimeMetadata.tryParse(
+        await metadataFile.readAsString(),
+      );
+      if (cachedMetadata != null &&
+          cachedMetadata.tagName == bundledVersion &&
+          cachedMetadata.assetName == supportedAssetName) {
         onProgress?.call('已使用内置运行时 ${cachedMetadata.tagName}', 1);
         return cachedMetadata;
       }

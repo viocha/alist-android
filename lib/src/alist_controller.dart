@@ -84,7 +84,10 @@ class AListController extends ChangeNotifier {
             : envPassword ?? '');
 
     paths = await _nativeApi.getPaths();
-    installedRuntime = await _readRuntimeMetadata();
+    installedRuntime = await _runtimeDownloader.ensureLatestRuntime(
+      paths: paths!,
+      force: false,
+    );
     await refresh();
 
     _runtimeEventsSubscription?.cancel();
@@ -205,13 +208,12 @@ class AListController extends ChangeNotifier {
     return _runBusy(
       label: '正在导入配置文件…',
       action: () async {
-        final file = await FilePicker.platform.pickFiles(
+        final files = await FilePicker.pickFiles(
           dialogTitle: '选择要导入的 AList 配置',
           type: FileType.custom,
           allowedExtensions: const <String>['json'],
-          withData: true,
         );
-        if (file == null || file.files.isEmpty) {
+        if (files.isEmpty) {
           return const OperationResult(
             success: false,
             message: '已取消导入。',
@@ -219,10 +221,7 @@ class AListController extends ChangeNotifier {
           );
         }
 
-        final bytes = file.files.single.bytes;
-        if (bytes == null) {
-          return const OperationResult(success: false, message: '读取配置文件失败。');
-        }
+        final bytes = await files.single.readAsBytes();
 
         final configFile = File(currentPaths.configPath);
         await configFile.parent.create(recursive: true);
@@ -255,7 +254,7 @@ class AListController extends ChangeNotifier {
         }
 
         final bytes = await configFile.readAsBytes();
-        final savedPath = await FilePicker.platform.saveFile(
+        final savedPath = await FilePicker.saveFile(
           dialogTitle: '导出 AList 配置',
           fileName: 'alist-config-${_timestampForFileName()}.json',
           type: FileType.custom,

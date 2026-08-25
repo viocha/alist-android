@@ -36,7 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   archive: ^4.0.9
   shared_preferences: ^2.5.5
-  file_picker: ^10.3.10
+  file_picker: ^12.1.0
   path: ^1.9.1
 
 dev_dependencies:
