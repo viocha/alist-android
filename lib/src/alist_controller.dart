@@ -52,6 +52,7 @@ class AListController extends ChangeNotifier {
 
   bool initialized = false;
   bool busy = false;
+  bool clearingLogs = false;
   String busyMessage = '';
   double? busyProgress;
   String logs = '';
@@ -281,21 +282,32 @@ class AListController extends ChangeNotifier {
       return const OperationResult(success: false, message: '应用路径尚未就绪。');
     }
 
-    return _runBusy(
-      label: '正在清空日志…',
-      action: () async {
-        final logFile = File(currentPaths.logPath);
-        await logFile.parent.create(recursive: true);
-        await logFile.writeAsString('', flush: true);
-        logs = '';
-        notifyListeners();
-        return const OperationResult(
-          success: true,
-          message: '日志已清空。',
-          shouldNotify: false,
-        );
-      },
-    );
+    if (clearingLogs) {
+      return const OperationResult(
+        success: false,
+        message: '正在清空日志，请稍候。',
+        shouldNotify: false,
+      );
+    }
+
+    clearingLogs = true;
+    notifyListeners();
+    try {
+      final logFile = File(currentPaths.logPath);
+      await logFile.parent.create(recursive: true);
+      await logFile.writeAsString('', flush: true);
+      logs = '';
+      return const OperationResult(
+        success: true,
+        message: '日志已清空。',
+        shouldNotify: false,
+      );
+    } catch (error) {
+      return OperationResult(success: false, message: '$error');
+    } finally {
+      clearingLogs = false;
+      notifyListeners();
+    }
   }
 
   Future<OperationResult> toggleService() {

@@ -396,7 +396,7 @@ class _AListHomePage extends StatelessWidget {
                                   ),
                                 ),
                                 TextButton.icon(
-                                  onPressed: busy
+                                  onPressed: busy || controller.clearingLogs
                                       ? null
                                       : () => onAction(controller.clearLogs),
                                   icon: const Icon(
