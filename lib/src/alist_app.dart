@@ -22,6 +22,7 @@ class _AListAppState extends State<AListApp> {
   final FocusNode _passwordFocusNode = FocusNode();
   final ScrollController _logScrollController = ScrollController();
   String _lastObservedLogs = '';
+  int _selectedNavigationIndex = 0;
 
   @override
   void initState() {
@@ -153,6 +154,15 @@ class _AListAppState extends State<AListApp> {
             portFocusNode: _portFocusNode,
             passwordFocusNode: _passwordFocusNode,
             logScrollController: _logScrollController,
+            selectedNavigationIndex: _selectedNavigationIndex,
+            onDestinationSelected: (index) {
+              if (_selectedNavigationIndex == index) {
+                return;
+              }
+              setState(() {
+                _selectedNavigationIndex = index;
+              });
+            },
             onAction: _runAction,
           );
         },
@@ -169,6 +179,8 @@ class _AListHomePage extends StatelessWidget {
     required this.portFocusNode,
     required this.passwordFocusNode,
     required this.logScrollController,
+    required this.selectedNavigationIndex,
+    required this.onDestinationSelected,
     required this.onAction,
   });
 
@@ -178,6 +190,8 @@ class _AListHomePage extends StatelessWidget {
   final FocusNode portFocusNode;
   final FocusNode passwordFocusNode;
   final ScrollController logScrollController;
+  final int selectedNavigationIndex;
+  final ValueChanged<int> onDestinationSelected;
   final Future<void> Function(Future<OperationResult> Function() action)
   onAction;
 
@@ -190,16 +204,11 @@ class _AListHomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 20,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AList',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ],
+        title: Text(
+          'AList',
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         actions: [
           PopupMenuButton<_MenuAction>(
@@ -244,205 +253,233 @@ class _AListHomePage extends StatelessWidget {
         ],
       ),
       body: controller.initialized
-          ? SafeArea(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                  children: [
-                    _StatusHero(
-                      running: status.running,
-                      message: status.lastMessage,
-                      versionLabel:
-                          runtime?.tagName ?? RuntimeDownloader.bundledVersion,
-                      localAccessUrls: controller.localAccessUrls,
-                      localAccessUrlsRefreshing:
-                          controller.localAccessUrlsRefreshing,
-                      onOpenInBrowser: status.running
-                          ? () => onAction(controller.openAListInBrowser)
-                          : null,
-                      onRefreshLocalAccessUrls: status.running
-                          ? () => onAction(controller.refreshLocalAccessUrls)
-                          : null,
+          ? IndexedStack(
+              index: selectedNavigationIndex,
+              children: [
+                SafeArea(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+                      children: [
+                        _StatusHero(
+                          running: status.running,
+                          versionLabel:
+                              runtime?.tagName ??
+                              RuntimeDownloader.bundledVersion,
+                          localAccessUrls: controller.localAccessUrls,
+                          localAccessUrlsRefreshing:
+                              controller.localAccessUrlsRefreshing,
+                          onOpenInBrowser: status.running
+                              ? () => onAction(controller.openAListInBrowser)
+                              : null,
+                          onRefreshLocalAccessUrls: status.running
+                              ? () =>
+                                    onAction(controller.refreshLocalAccessUrls)
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '服务控制',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 18),
+                                TextField(
+                                  controller: portController,
+                                  focusNode: portFocusNode,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  enabled: !status.running,
+                                  decoration: const InputDecoration(
+                                    labelText: '端口',
+                                  ),
+                                  onTapOutside: (_) => FocusManager
+                                      .instance
+                                      .primaryFocus
+                                      ?.unfocus(),
+                                  onChanged: controller.setPortInput,
+                                ),
+                                const SizedBox(height: 18),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: status.running
+                                      ? OutlinedButton.icon(
+                                          onPressed: busy
+                                              ? null
+                                              : () => onAction(
+                                                  controller.toggleService,
+                                                ),
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.stop_circle_outlined,
+                                          ),
+                                          label: const Text('停止服务'),
+                                        )
+                                      : FilledButton.icon(
+                                          onPressed: busy
+                                              ? null
+                                              : () => onAction(
+                                                  controller.toggleService,
+                                                ),
+                                          style: FilledButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.play_arrow_rounded,
+                                          ),
+                                          label: const Text('启动服务'),
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '管理员密码',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 18),
+                                TextField(
+                                  controller: passwordController,
+                                  focusNode: passwordFocusNode,
+                                  obscureText: !controller.passwordVisible,
+                                  enabled: !status.running,
+                                  decoration: InputDecoration(
+                                    labelText: '密码',
+                                    suffixIcon: IconButton(
+                                      onPressed:
+                                          controller.togglePasswordVisibility,
+                                      icon: Icon(
+                                        controller.passwordVisible
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                      ),
+                                    ),
+                                  ),
+                                  onTapOutside: (_) => FocusManager
+                                      .instance
+                                      .primaryFocus
+                                      ?.unfocus(),
+                                  onChanged: controller.setAdminPassword,
+                                ),
+                                const SizedBox(height: 18),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: controller.canApplyAdminPassword
+                                        ? () => onAction(
+                                            controller.applyAdminPassword,
+                                          )
+                                        : null,
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    child: const Text('修改密码'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '服务控制',
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 8, 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '日志',
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                            const SizedBox(height: 18),
-                            TextField(
-                              controller: portController,
-                              focusNode: portFocusNode,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              enabled: !busy,
-                              decoration: const InputDecoration(
-                                labelText: '端口',
-                              ),
-                              onTapOutside: (_) =>
-                                  FocusManager.instance.primaryFocus?.unfocus(),
-                              onChanged: controller.setPortInput,
-                            ),
-                            const SizedBox(height: 14),
-                            TextField(
-                              controller: passwordController,
-                              focusNode: passwordFocusNode,
-                              obscureText: !controller.passwordVisible,
-                              enabled: !busy,
-                              decoration: InputDecoration(
-                                labelText: '管理员密码',
-                                suffixIcon: IconButton(
-                                  onPressed: busy
-                                      ? null
-                                      : controller.togglePasswordVisibility,
-                                  icon: Icon(
-                                    controller.passwordVisible
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                  ),
-                                ),
-                              ),
-                              onTapOutside: (_) =>
-                                  FocusManager.instance.primaryFocus?.unfocus(),
-                              onChanged: controller.setAdminPassword,
-                            ),
-                            const SizedBox(height: 18),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                OutlinedButton(
-                                  onPressed: controller.canApplyAdminPassword
-                                      ? () => onAction(
-                                          controller.applyAdminPassword,
-                                        )
-                                      : null,
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 18,
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                  child: const Text('修改密码'),
-                                ),
-                                const SizedBox(width: 12),
-                                status.running
-                                    ? OutlinedButton.icon(
-                                        onPressed: busy
-                                            ? null
-                                            : () => onAction(
-                                                controller.toggleService,
-                                              ),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 18,
-                                            vertical: 12,
-                                          ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.stop_circle_outlined,
-                                        ),
-                                        label: const Text('停止服务'),
-                                      )
-                                    : FilledButton.icon(
-                                        onPressed: busy
-                                            ? null
-                                            : () => onAction(
-                                                controller.toggleService,
-                                              ),
-                                        style: FilledButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 18,
-                                            vertical: 12,
-                                          ),
-                                        ),
-                                        icon: const Icon(
-                                          Icons.play_arrow_rounded,
-                                        ),
-                                        label: const Text('启动服务'),
-                                      ),
-                              ],
-                            ),
-                          ],
-                        ),
+                          ),
+                          TextButton.icon(
+                            onPressed: busy || controller.clearingLogs
+                                ? null
+                                : () => onAction(controller.clearLogs),
+                            icon: const Icon(Icons.cleaning_services_outlined),
+                            label: const Text('清空'),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '日志面板',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                                TextButton.icon(
-                                  onPressed: busy || controller.clearingLogs
-                                      ? null
-                                      : () => onAction(controller.clearLogs),
-                                  icon: const Icon(
-                                    Icons.cleaning_services_outlined,
-                                  ),
-                                  label: const Text('清空'),
-                                ),
-                              ],
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFAFAF7),
+                          border: Border(
+                            top: BorderSide(color: Color(0xFFE6E4DB)),
+                          ),
+                        ),
+                        child: SingleChildScrollView(
+                          controller: logScrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: SelectableText(
+                            controller.logs.isEmpty ? '暂无日志。' : controller.logs,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                              height: 1.4,
+                              color: const Color(0xFF182230),
                             ),
-                            const SizedBox(height: 10),
-                            Container(
-                              height: 280,
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFAFAF7),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFFE6E4DB),
-                                ),
-                              ),
-                              child: SingleChildScrollView(
-                                controller: logScrollController,
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                child: SelectableText(
-                                  controller.logs.isEmpty
-                                      ? '暂无日志。'
-                                      : controller.logs,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        fontFamily: 'monospace',
-                                        height: 1.4,
-                                        color: const Color(0xFF182230),
-                                      ),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
+              ],
             )
           : const Center(child: CircularProgressIndicator()),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedNavigationIndex,
+        onDestinationSelected: onDestinationSelected,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dns_outlined),
+            selectedIcon: Icon(Icons.dns_rounded),
+            label: '服务',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.article_outlined),
+            selectedIcon: Icon(Icons.article_rounded),
+            label: '日志',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -450,7 +487,6 @@ class _AListHomePage extends StatelessWidget {
 class _StatusHero extends StatelessWidget {
   const _StatusHero({
     required this.running,
-    required this.message,
     required this.versionLabel,
     required this.localAccessUrls,
     required this.localAccessUrlsRefreshing,
@@ -459,7 +495,6 @@ class _StatusHero extends StatelessWidget {
   });
 
   final bool running;
-  final String message;
   final String versionLabel;
   final List<String> localAccessUrls;
   final bool localAccessUrlsRefreshing;
@@ -514,13 +549,6 @@ class _StatusHero extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            message,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: secondary),
-          ),
           const SizedBox(height: 18),
           Wrap(
             spacing: 10,
@@ -551,7 +579,7 @@ class _StatusHero extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          '局域网访问',
+                          '访问地址',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 color: foreground,

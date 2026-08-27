@@ -1032,8 +1032,9 @@ class AListController extends ChangeNotifier {
         : fallbackHosts;
     final sortedHosts = selectedHosts.toList(growable: false)
       ..sort(_compareIpv4Addresses);
-    return sortedHosts
-        .map((host) => 'http://$host:$port')
-        .toList(growable: false);
+    return <String>[
+      'http://localhost:$port',
+      ...sortedHosts.map((host) => 'http://$host:$port'),
+    ];
   }
 }

@@ -113,10 +113,8 @@ class AListForegroundService : Service() {
         )
 
         val collapsedText =
-            when {
-                accessUrls.isNotEmpty() -> accessUrls.first()
-                else -> "端口 $port"
-            }
+            accessUrls.firstOrNull { url -> !url.startsWith("http://localhost:") }
+                ?: "端口 $port"
         val expandedText =
             if (accessUrls.isEmpty()) {
                 "局域网访问地址暂不可用"
@@ -230,9 +228,14 @@ class AListForegroundService : Service() {
         }
 
         val selectedHosts = if (privateHosts.isNotEmpty()) privateHosts else fallbackHosts
-        return selectedHosts
-            .sortedWith(::compareIpv4Hosts)
-            .map { host -> "http://$host:$port" }
+        return buildList {
+            add("http://localhost:$port")
+            addAll(
+                selectedHosts
+                    .sortedWith(::compareIpv4Hosts)
+                    .map { host -> "http://$host:$port" },
+            )
+        }
     }
 
     private fun isPrivateIpv4(host: String): Boolean {

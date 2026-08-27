@@ -55,6 +55,9 @@ object AListRuntime {
     private val disallowedControlRegex = Regex("""[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]""")
     private val logLevelPrefixRegex =
         Regex("""^(?:\[(?:stdout|stderr)\]\s+)?(?:INFO|WARN|ERRO|FATA|DEBU|TRAC|PANI)\[[^\]]+\]\s*""")
+    private const val LOG_FILE_MAX_BYTES = 1024L * 1024L
+    private const val LOG_FILE_RETAIN_BYTES = LOG_FILE_MAX_BYTES / 2
+    private val logFileLock = Any()
 
     @Volatile
     private var process: Process? = null
@@ -111,17 +114,13 @@ object AListRuntime {
 
     fun readLogTail(context: Context, maxBytes: Int): String {
         val logFile = File(pathsFor(context).logPath)
-        if (!logFile.exists()) {
-            return ""
-        }
+        synchronized(logFileLock) {
+            if (!logFile.exists()) {
+                return ""
+            }
 
-        RandomAccessFile(logFile, "r").use { raf ->
-            val fileLength = raf.length()
-            val safeBytes = maxBytes.coerceAtLeast(1)
-            val start = (fileLength - safeBytes).coerceAtLeast(0)
-            raf.seek(start)
-            val buffer = ByteArray((fileLength - start).toInt())
-            raf.readFully(buffer)
+            trimLogFileIfNeeded(logFile)
+            val buffer = readLogTailBytes(logFile, maxBytes.coerceAtLeast(1))
             return String(buffer, Charsets.UTF_8)
         }
     }
@@ -388,13 +387,90 @@ object AListRuntime {
             .filter { it.isNotBlank() }
             .joinToString(separator = "\n") { "[$timestamp] $it" }
         if (formatted.isNotBlank()) {
-            logFile.appendText("$formatted\n")
+            val entryBytes = "$formatted\n".toByteArray(Charsets.UTF_8)
+            synchronized(logFileLock) {
+                appendBoundedLog(logFile, entryBytes)
+            }
             emitEvent(
                 mapOf(
                     "type" to "logs",
                     "logs" to formatted,
                 ),
             )
+        }
+    }
+
+    private fun appendBoundedLog(logFile: File, entryBytes: ByteArray) {
+        if (entryBytes.size.toLong() > LOG_FILE_MAX_BYTES) {
+            logFile.writeBytes(tailAtLineBoundary(entryBytes, LOG_FILE_RETAIN_BYTES.toInt()))
+            return
+        }
+        if (!logFile.exists() || logFile.length() + entryBytes.size <= LOG_FILE_MAX_BYTES) {
+            logFile.appendBytes(entryBytes)
+            return
+        }
+
+        val retainBudget = (LOG_FILE_RETAIN_BYTES - entryBytes.size).coerceAtLeast(0L).toInt()
+        val retainedBytes = readLogTailBytes(logFile, retainBudget)
+        logFile.outputStream().use { output ->
+            output.write(retainedBytes)
+            if (entryBytes.size.toLong() <= LOG_FILE_RETAIN_BYTES) {
+                output.write(entryBytes)
+            } else {
+                output.write(tailAtLineBoundary(entryBytes, LOG_FILE_RETAIN_BYTES.toInt()))
+            }
+        }
+    }
+
+    private fun trimLogFileIfNeeded(logFile: File) {
+        if (logFile.length() <= LOG_FILE_MAX_BYTES) {
+            return
+        }
+
+        val retainedBytes = readLogTailBytes(logFile, LOG_FILE_RETAIN_BYTES.toInt())
+        logFile.writeBytes(retainedBytes)
+    }
+
+    private fun readLogTailBytes(logFile: File, maxBytes: Int): ByteArray {
+        if (!logFile.exists() || maxBytes <= 0) {
+            return ByteArray(0)
+        }
+
+        RandomAccessFile(logFile, "r").use { raf ->
+            val fileLength = raf.length()
+            if (fileLength <= maxBytes) {
+                return ByteArray(fileLength.toInt()).also(raf::readFully)
+            }
+
+            val start = fileLength - maxBytes
+            raf.seek(start - 1)
+            val buffer = ByteArray((fileLength - start + 1).toInt())
+            raf.readFully(buffer)
+            return tailAtLineBoundary(buffer, maxBytes)
+        }
+    }
+
+    private fun tailAtLineBoundary(bytes: ByteArray, maxBytes: Int): ByteArray {
+        if (bytes.size <= maxBytes) {
+            return bytes
+        }
+
+        val offset = bytes.size - maxBytes
+        if (offset > 0 && bytes[offset - 1] == '\n'.code.toByte()) {
+            return bytes.copyOfRange(offset, bytes.size)
+        }
+
+        var newlineIndex = -1
+        for (index in offset until bytes.size) {
+            if (bytes[index] == '\n'.code.toByte()) {
+                newlineIndex = index
+                break
+            }
+        }
+        return if (newlineIndex >= 0 && newlineIndex + 1 < bytes.size) {
+            bytes.copyOfRange(newlineIndex + 1, bytes.size)
+        } else {
+            ByteArray(0)
         }
     }
 
