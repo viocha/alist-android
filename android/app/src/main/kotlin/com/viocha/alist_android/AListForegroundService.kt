@@ -112,14 +112,13 @@ class AListForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val collapsedText =
-            accessUrls.firstOrNull { url -> !url.startsWith("http://localhost:") }
-                ?: "端口 $port"
+        val lanAccessUrls = accessUrls.filterNot { url -> url.startsWith("http://localhost:") }
+        val collapsedText = lanAccessUrls.firstOrNull() ?: "端口 $port"
         val expandedText =
-            if (accessUrls.isEmpty()) {
+            if (lanAccessUrls.isEmpty()) {
                 "局域网访问地址暂不可用"
             } else {
-                accessUrls.joinToString(separator = "\n")
+                lanAccessUrls.joinToString(separator = "\n")
             }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)

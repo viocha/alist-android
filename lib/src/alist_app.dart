@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -23,16 +25,27 @@ class _AListAppState extends State<AListApp> {
   final ScrollController _logScrollController = ScrollController();
   String _lastObservedLogs = '';
   int _selectedNavigationIndex = 0;
+  bool _showInitialLoading = false;
+  Timer? _initialLoadingTimer;
 
   @override
   void initState() {
     super.initState();
     _controller = AListController()..addListener(_syncTextControllers);
     _controller.initialize();
+    _initialLoadingTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted || _controller.initialized) {
+        return;
+      }
+      setState(() {
+        _showInitialLoading = true;
+      });
+    });
   }
 
   @override
   void dispose() {
+    _initialLoadingTimer?.cancel();
     _controller
       ..removeListener(_syncTextControllers)
       ..dispose();
@@ -155,6 +168,7 @@ class _AListAppState extends State<AListApp> {
             passwordFocusNode: _passwordFocusNode,
             logScrollController: _logScrollController,
             selectedNavigationIndex: _selectedNavigationIndex,
+            showInitialLoading: _showInitialLoading,
             onDestinationSelected: (index) {
               if (_selectedNavigationIndex == index) {
                 return;
@@ -180,6 +194,7 @@ class _AListHomePage extends StatelessWidget {
     required this.passwordFocusNode,
     required this.logScrollController,
     required this.selectedNavigationIndex,
+    required this.showInitialLoading,
     required this.onDestinationSelected,
     required this.onAction,
   });
@@ -191,6 +206,7 @@ class _AListHomePage extends StatelessWidget {
   final FocusNode passwordFocusNode;
   final ScrollController logScrollController;
   final int selectedNavigationIndex;
+  final bool showInitialLoading;
   final ValueChanged<int> onDestinationSelected;
   final Future<void> Function(Future<OperationResult> Function() action)
   onAction;
@@ -450,11 +466,12 @@ class _AListHomePage extends StatelessWidget {
                           physics: const AlwaysScrollableScrollPhysics(),
                           child: SelectableText(
                             controller.logs.isEmpty ? '暂无日志。' : controller.logs,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontFamily: 'monospace',
-                              height: 1.4,
-                              color: const Color(0xFF182230),
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  fontFamily: 'monospace',
+                                  height: 1.4,
+                                  color: const Color(0xFF182230),
+                                ),
                           ),
                         ),
                       ),
@@ -463,7 +480,9 @@ class _AListHomePage extends StatelessWidget {
                 ),
               ],
             )
-          : const Center(child: CircularProgressIndicator()),
+          : showInitialLoading
+          ? const Center(child: CircularProgressIndicator())
+          : const SizedBox.expand(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedNavigationIndex,
         onDestinationSelected: onDestinationSelected,
@@ -660,13 +679,27 @@ class _AccessUrlRow extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: SelectableText(
-        url,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          height: 1.35,
-        ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SelectableText(
+              url,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            tooltip: '复制地址',
+            visualDensity: VisualDensity.compact,
+            color: Colors.white,
+            onPressed: () => Clipboard.setData(ClipboardData(text: url)),
+            icon: const Icon(Icons.copy_rounded, size: 18),
+          ),
+        ],
       ),
     );
   }
