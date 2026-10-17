@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.Context
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -42,6 +43,10 @@ class AListForegroundService : Service() {
             }
 
             ACTION_UPDATE_NOTIFICATION -> {
+                if (AListRuntime.getStatus(applicationContext)["running"] != true) {
+                    stopServiceNotification()
+                    return START_NOT_STICKY
+                }
                 val port = intent.getIntExtra(EXTRA_PORT, 5244)
                 val message = intent.getStringExtra(EXTRA_MESSAGE) ?: "服务运行中"
                 updateForegroundNotification(port, message)
@@ -133,6 +138,7 @@ class AListForegroundService : Service() {
             .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
+            .setSilent(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openAppPendingIntent)
             .setDeleteIntent(restorePendingIntent)
@@ -275,6 +281,16 @@ class AListForegroundService : Service() {
     }
 
     companion object {
+        // 前台恢复只修复通知，不启动 AList 进程；服务端再次核实运行状态。
+        fun restoreNotificationIfMissing(context: Context) {
+            if (AListRuntime.getStatus(context)["running"] != true) return
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (manager.activeNotifications.any { it.id == NOTIFICATION_ID && it.tag == null }) return
+            context.startService(Intent(context, AListForegroundService::class.java).apply {
+                action = ACTION_RESTORE_NOTIFICATION
+            })
+        }
+
         const val ACTION_START = "com.viocha.alist_android.action.START"
         const val ACTION_STOP = "com.viocha.alist_android.action.STOP"
         const val ACTION_RESTORE_NOTIFICATION = "com.viocha.alist_android.action.RESTORE_NOTIFICATION"

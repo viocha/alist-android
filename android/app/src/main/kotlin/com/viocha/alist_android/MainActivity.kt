@@ -198,6 +198,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        AListForegroundService.restoreNotificationIfMissing(applicationContext)
 
         if (!awaitingManageStorageResult) {
             return
