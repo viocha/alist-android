@@ -10,11 +10,11 @@ class RuntimeDownloader {
 
   static const String supportedAbi = 'arm64-v8a';
   static const String supportedAssetName = 'alist-android-arm64.tar.gz';
-  static const String bundledAssetPath =
-      'assets/runtime/alist-android-arm64.tar.gz';
   static const String bundledVersion = 'v3.66.0';
   static const String bundledSourceUrl =
       'https://github.com/AlistGo/alist/releases/download/v3.66.0/alist-android-arm64.tar.gz';
+  static const String bundledArchiveSha256 =
+      '00126a1543ad125f66bd7c9bd3f91641ca6515bcc74c58ed6fb49e32853ace2e';
 
   Future<RuntimeMetadata> ensureLatestRuntime({
     required AListPaths paths,

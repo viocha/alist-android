@@ -10,7 +10,7 @@ plugins {
 
 val bundledRuntimeArchive = project.layout.projectDirectory
     .dir("../..")
-    .file("assets/runtime/alist-android-arm64.tar.gz")
+    .file("build/runtime/alist-android-arm64.tar.gz")
 val generatedRuntimeJniDir = layout.buildDirectory.dir("generated/alistRuntimeJniLibs")
 val prepareBundledAListRuntime by tasks.registering(Sync::class) {
     from(tarTree(resources.gzip(bundledRuntimeArchive))) {

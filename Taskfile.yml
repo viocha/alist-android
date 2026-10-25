@@ -15,6 +15,11 @@ vars:
   ANDROID_RES_DIR: android/app/src/main/res
 
 tasks:
+  prepare:android:runtime:
+    desc: 下载并校验内置 AList 运行时，已校验的缓存可直接使用
+    cmds:
+      - 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare_alist_runtime.ps1'
+
   prepare:android:icon:
     desc: 根据 SVG 源文件生成应用启动图标
     cmds:
@@ -23,6 +28,7 @@ tasks:
   build:android:
     desc: 构建 ARM64 Android 调试版 APK
     cmds:
+      - task: prepare:android:runtime
       - task: prepare:android:icon
       - '{{.FLUTTER}} build apk --debug --target-platform {{.BUILD_TARGET_PLATFORM}}'
 
@@ -46,6 +52,7 @@ tasks:
   debug:android:
     desc: 在首台已连接的 Android 设备上运行应用并启用 Flutter 调试和热重载
     cmds:
+      - task: prepare:android:runtime
       - >
         powershell -NoProfile -Command '$deviceLine = (& {{.ADB}} devices) |
         Where-Object { $_ -match "^[^\s]+\s+device$" } | Select-Object -First 1;

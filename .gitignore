@@ -31,6 +31,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
 /coverage/
 /node_modules/
 
@@ -42,6 +43,7 @@ migrate_working_dir/
 /tmp-*.xml
 
 # Large local runtime binary
+/assets/runtime/
 /android/app/src/main/jniLibs/
 
 # Symbolication related
