@@ -16,35 +16,35 @@ vars:
 
 tasks:
   prepare:android:icon:
-    desc: Generate launcher icon assets from the source SVG
+    desc: 根据 SVG 源文件生成应用启动图标
     cmds:
       - 'node "{{.ICON_SCRIPT}}" --source "{{.ICON_SOURCE_SVG}}" --output "{{.ICON_OUTPUT_PNG}}" --android-res "{{.ANDROID_RES_DIR}}"'
 
   build:android:
-    desc: Build the arm64 Android debug APK
+    desc: 构建 ARM64 Android 调试版 APK
     cmds:
       - task: prepare:android:icon
       - '{{.FLUTTER}} build apk --debug --target-platform {{.BUILD_TARGET_PLATFORM}}'
 
   install:android:only:
-    desc: Install the existing arm64 Android debug APK on the connected device
+    desc: 将已构建的 ARM64 Android 调试版 APK 安装到已连接的设备
     cmds:
       - 'powershell -NoProfile -Command "if (-not (Test-Path ''{{.DEBUG_APK}}'')) { throw ''APK 不存在，请先执行 task build:android'' }; & {{.ADB}} install -r ''{{.DEBUG_APK}}''"'
 
   install:android:
-    desc: Build and install the arm64 Android debug APK on the connected device
+    desc: 构建 ARM64 Android 调试版 APK 并安装到已连接的设备
     deps:
       - build:android
     cmds:
       - task: install:android:only
 
   launch:android:
-    desc: Launch the app on the connected Android device
+    desc: 在已连接的 Android 设备上启动应用
     cmds:
       - '{{.ADB}} shell am start -n {{.ANDROID_PACKAGE}}/{{.ANDROID_ACTIVITY}}'
 
   debug:android:
-    desc: Run the app on the first connected Android device with Flutter debug and hot reload
+    desc: 在首台已连接的 Android 设备上运行应用并启用 Flutter 调试和热重载
     cmds:
       - >
         powershell -NoProfile -Command '$deviceLine = (& {{.ADB}} devices) |
@@ -54,7 +54,7 @@ tasks:
         & {{.FLUTTER}} run -d $serial'
 
   run:android:
-    desc: Build, install, and launch the arm64 Android app on the connected device
+    desc: 构建 ARM64 Android 应用并在已连接的设备上安装和启动
     deps:
       - install:android
     cmds:

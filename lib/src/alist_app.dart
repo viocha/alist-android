@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -25,27 +23,16 @@ class _AListAppState extends State<AListApp> {
   final ScrollController _logScrollController = ScrollController();
   String _lastObservedLogs = '';
   int _selectedNavigationIndex = 0;
-  bool _showInitialLoading = false;
-  Timer? _initialLoadingTimer;
 
   @override
   void initState() {
     super.initState();
     _controller = AListController()..addListener(_syncTextControllers);
     _controller.initialize();
-    _initialLoadingTimer = Timer(const Duration(milliseconds: 500), () {
-      if (!mounted || _controller.initialized) {
-        return;
-      }
-      setState(() {
-        _showInitialLoading = true;
-      });
-    });
   }
 
   @override
   void dispose() {
-    _initialLoadingTimer?.cancel();
     _controller
       ..removeListener(_syncTextControllers)
       ..dispose();
@@ -168,7 +155,6 @@ class _AListAppState extends State<AListApp> {
             passwordFocusNode: _passwordFocusNode,
             logScrollController: _logScrollController,
             selectedNavigationIndex: _selectedNavigationIndex,
-            showInitialLoading: _showInitialLoading,
             onDestinationSelected: (index) {
               if (_selectedNavigationIndex == index) {
                 return;
@@ -194,7 +180,6 @@ class _AListHomePage extends StatelessWidget {
     required this.passwordFocusNode,
     required this.logScrollController,
     required this.selectedNavigationIndex,
-    required this.showInitialLoading,
     required this.onDestinationSelected,
     required this.onAction,
   });
@@ -206,7 +191,6 @@ class _AListHomePage extends StatelessWidget {
   final FocusNode passwordFocusNode;
   final ScrollController logScrollController;
   final int selectedNavigationIndex;
-  final bool showInitialLoading;
   final ValueChanged<int> onDestinationSelected;
   final Future<void> Function(Future<OperationResult> Function() action)
   onAction;
@@ -480,9 +464,7 @@ class _AListHomePage extends StatelessWidget {
                 ),
               ],
             )
-          : showInitialLoading
-          ? const Center(child: CircularProgressIndicator())
-          : const SizedBox.expand(),
+          : const Center(child: CircularProgressIndicator()),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedNavigationIndex,
         onDestinationSelected: onDestinationSelected,
